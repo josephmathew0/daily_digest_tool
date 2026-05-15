@@ -1,0 +1,42 @@
+[
+  {
+    "id": "meeting_001",
+    "source_type": "meeting",
+    "source_ref": "Prototype standup",
+    "title": "Prototype Standup Summary",
+    "text": "Decision: proceed with revised motor mount CAD. Action item: Alex validates connector clearance by Friday.",
+    "timestamp": "2026-05-12T16:00:00Z",
+    "attendees": ["Maya Chen", "Alex Rivera", "Sam Ortiz"],
+    "project": "warehouse_robot_v2"
+  },
+  {
+    "id": "meeting_002",
+    "source_type": "meeting",
+    "source_ref": "EVT readiness review",
+    "title": "EVT Readiness Review",
+    "text": "PCB thermal instability remains an EVT risk. Firmware tuning reduced rise but reliability validation still needs margin.",
+    "timestamp": "2026-05-13T18:00:00Z",
+    "attendees": ["Alex Rivera", "Sam Ortiz", "Jordan Lee"],
+    "project": "warehouse_robot_v2"
+  },
+  {
+    "id": "meeting_003",
+    "source_type": "meeting",
+    "source_ref": "Supply review",
+    "title": "Supply Chain Review",
+    "text": "Dependency: supply chain is waiting on finalized BOM before releasing bracket PO. Lead time risk affects prototype build.",
+    "timestamp": "2026-05-14T15:30:00Z",
+    "attendees": ["Priya Shah", "Sam Ortiz"],
+    "project": "warehouse_robot_v2"
+  },
+  {
+    "id": "meeting_004",
+    "source_type": "meeting",
+    "source_ref": "Demo scope review",
+    "title": "Customer Demo Scope Review",
+    "text": "Decision: keep customer demo scope to navigation, lift actuation, and safe stop. Inventory scanning is deferred.",
+    "timestamp": "2026-05-14T17:00:00Z",
+    "attendees": ["Jordan Lee", "Sam Ortiz"],
+    "project": "warehouse_robot_v2"
+  }
+]

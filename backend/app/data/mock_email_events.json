@@ -1,0 +1,50 @@
+[
+  {
+    "id": "email_001",
+    "source_type": "email",
+    "source_ref": "Vendor email",
+    "author_name": "Northline Metals",
+    "author_email": "rep@northline.example",
+    "title": "Updated bracket lead time",
+    "text": "Aluminum bracket lead time increased to 3 weeks unless PO is issued by end of day.",
+    "timestamp": "2026-05-10T18:20:00Z",
+    "recipients": ["priya@example.com", "sam@example.com"],
+    "project": "warehouse_robot_v2"
+  },
+  {
+    "id": "email_002",
+    "source_type": "email",
+    "source_ref": "Customer email",
+    "author_name": "Pilot Customer",
+    "author_email": "ops@customer.example",
+    "title": "Demo expectations",
+    "text": "For next week's customer demo, safe stop and lift repeatability matter more than inventory scanning.",
+    "timestamp": "2026-05-11T17:00:00Z",
+    "recipients": ["jordan@example.com"],
+    "project": "warehouse_robot_v2"
+  },
+  {
+    "id": "email_003",
+    "source_type": "email",
+    "source_ref": "Internal email",
+    "author_name": "Sam Ortiz",
+    "author_role": "engineering_manager",
+    "title": "Prototype readiness risks",
+    "text": "Risk review: PCB thermal margin, connector clearance, and bracket lead time are the main threats to the customer demo milestone.",
+    "timestamp": "2026-05-12T18:45:00Z",
+    "recipients": ["maya@example.com", "alex@example.com", "priya@example.com"],
+    "project": "warehouse_robot_v2"
+  },
+  {
+    "id": "email_004",
+    "source_type": "email",
+    "source_ref": "Vendor email",
+    "author_name": "Northline Metals",
+    "author_email": "rep@northline.example",
+    "title": "Bracket order hold",
+    "text": "Decision needed today: release PO for prototype brackets or lose the reserved inventory slot.",
+    "timestamp": "2026-05-14T11:10:00Z",
+    "recipients": ["priya@example.com"],
+    "project": "warehouse_robot_v2"
+  }
+]

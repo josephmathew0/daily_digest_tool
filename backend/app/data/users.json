@@ -1,0 +1,7 @@
+[
+  {"id": "maya", "name": "Maya Chen", "role": "mechanical_engineer"},
+  {"id": "alex", "name": "Alex Rivera", "role": "electrical_engineer"},
+  {"id": "priya", "name": "Priya Shah", "role": "supply_chain"},
+  {"id": "sam", "name": "Sam Ortiz", "role": "engineering_manager"},
+  {"id": "jordan", "name": "Jordan Lee", "role": "product_manager"}
+]

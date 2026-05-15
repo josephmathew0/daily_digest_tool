@@ -1,0 +1,4 @@
+Extract entity-centric execution signals from normalized communication events.
+
+Return issues, risks, decisions, dependencies, action items, and milestones.
+Slack/email/meeting messages are evidence only; the project entity is the durable record.
