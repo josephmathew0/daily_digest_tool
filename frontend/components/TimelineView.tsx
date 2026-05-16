@@ -1,5 +1,10 @@
 import type { EventPayload } from "@/services/api";
 
+function preview(text: string) {
+  if (text.length <= 900) return text;
+  return `${text.slice(0, 900)}...`;
+}
+
 export function TimelineView({ events }: { events: EventPayload[] }) {
   return (
     <section>
@@ -11,8 +16,8 @@ export function TimelineView({ events }: { events: EventPayload[] }) {
               <span>{event.source_type} / {event.source_ref}</span>
               <span>{new Date(event.timestamp).toLocaleString()}</span>
             </div>
-            <p className="mt-1 text-sm font-medium">{event.title || event.author_name}</p>
-            <p className="mt-1 text-sm leading-5 text-slate-700">{event.text}</p>
+            <p className="mt-1 min-w-0 break-words text-sm font-medium">{event.title || event.author_name}</p>
+            <p className="mt-1 min-w-0 overflow-hidden break-words text-sm leading-5 text-slate-700">{preview(event.text)}</p>
           </article>
         ))}
       </div>

@@ -2,6 +2,9 @@ __pycache__/
 *.pyc
 .env
 .venv/
+gmail_credentials.json
+gmail_token.json
+tokens/
 node_modules/
 .next/
 dist/
