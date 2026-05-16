@@ -22,9 +22,7 @@ class RealSlackSource(CommunicationSource):
         self._user_cache: dict[str, dict[str, str | None]] = {}
 
     def fetch_events(self) -> list[CommunicationEvent]:
-        if not self.token or self.token.startswith("xoxb-your-real-token"):
-            return []
-        if not self.channel_id:
+        if not self.token or self.token.startswith("xoxb-your-real-token") or not self.channel_id:
             return []
 
         events: list[CommunicationEvent] = []
