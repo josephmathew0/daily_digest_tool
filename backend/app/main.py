@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,6 +13,7 @@ from app.services.state_tracker import StateTracker
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 ADDED_EVENTS_PATH = DATA_DIR / "added_events.json"
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="EverCurrent Daily Digest API")
 app.add_middleware(

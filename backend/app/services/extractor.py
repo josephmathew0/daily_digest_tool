@@ -19,6 +19,9 @@ ROLE_KEYWORDS = {
 class Extractor:
     def extract(self, event: CommunicationEvent) -> list[ProjectEntity]:
         text = f"{event.title or ''} {event.text}".lower()
+        if self._is_low_signal(text):
+            return []
+
         entity_type = self._entity_type(text)
         severity = self._severity(text)
         status = self._status(text)
@@ -62,6 +65,33 @@ class Extractor:
         if any(term in text for term in ["milestone", "demo", "evt", "dvt", "pvt"]):
             return EntityType.MILESTONE
         return EntityType.ISSUE
+
+    def _is_low_signal(self, text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", "", text).strip()
+        normalized = re.sub(r"\s+", " ", normalized)
+        low_signal_messages = {
+            "ack",
+            "acknowledged",
+            "ok",
+            "okay",
+            "got it",
+            "thanks",
+            "thank you",
+            "sounds good",
+            "sgtm",
+            "yes",
+            "no",
+        }
+        if normalized in low_signal_messages:
+            return True
+
+        words = normalized.split()
+        signal_terms = [
+            "blocked", "blocking", "risk", "decision", "depends", "dependency",
+            "action", "milestone", "thermal", "tolerance", "lead time", "bom",
+            "cad", "connector", "firmware", "supplier", "demo", "resolved",
+        ]
+        return len(words) <= 3 and not any(term in normalized for term in signal_terms)
 
     def _severity(self, text: str) -> Severity:
         if any(term in text for term in ["critical", "customer demo blocked", "cannot proceed"]):

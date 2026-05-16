@@ -3,3 +3,5 @@ uvicorn[standard]==0.34.2
 pydantic==2.11.4
 slack_sdk==3.35.0
 httpx==0.28.1
+python-dotenv==1.2.2
+certifi==2026.4.22
