@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.database.repository import init_db, list_events, upsert_events
 from app.models.communication_event import CommunicationEvent
 from app.services.digest_generator import DigestGenerator
 from app.services.ingestion_service import IngestionService
@@ -25,6 +26,11 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def startup() -> None:
+    init_db()
+
+
 def load_json(name: str):
     return json.loads((DATA_DIR / name).read_text())
 
@@ -36,7 +42,13 @@ def load_added_events() -> list[CommunicationEvent]:
 
 
 def all_events() -> list[CommunicationEvent]:
-    return sorted(IngestionService().fetch_all() + load_added_events(), key=lambda event: event.timestamp)
+    events = list_events()
+    if events:
+        return events
+
+    source_events = sorted(IngestionService().fetch_all() + load_added_events(), key=lambda event: event.timestamp)
+    upsert_events(source_events)
+    return list_events()
 
 
 def all_entities():
@@ -60,10 +72,9 @@ def get_projects():
 
 @app.get("/events")
 def get_events(project: str | None = None):
-    events = all_events()
-    if project:
-        events = [event for event in events if event.project == project]
-    return events
+    if not list_events():
+        all_events()
+    return list_events(project)
 
 
 @app.post("/events")
@@ -71,14 +82,24 @@ def add_event(event: CommunicationEvent):
     current = [item.model_dump(mode="json") for item in load_added_events()]
     current.append(event.model_dump(mode="json"))
     ADDED_EVENTS_PATH.write_text(json.dumps(current, indent=2))
+    upsert_events([event])
     return {"created": event.id}
 
 
 @app.post("/sync")
 def sync_sources():
-    events = all_events()
-    entities = all_entities()
-    return {"events": len(events), "entities": len(entities)}
+    events = sorted(IngestionService().fetch_all() + load_added_events(), key=lambda event: event.timestamp)
+    stats = upsert_events(events)
+    events = list_events()
+    tracker = StateTracker()
+    entities = tracker.build_entities(events)
+    return {
+        "events": len(events),
+        "entities": len(entities),
+        **stats,
+        "extracted": tracker.last_stats["extracted"],
+        "reused_extractions": tracker.last_stats["reused"],
+    }
 
 
 @app.get("/digest")
