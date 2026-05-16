@@ -6,8 +6,8 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
-    environment:
-      - SLACK_SOURCE=mock
+    env_file:
+      - ./backend/.env
 
   frontend:
     build:
