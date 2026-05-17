@@ -41,3 +41,32 @@ def test_sync_persists_and_reuses_extractions(monkeypatch):
     digest = client.get("/digest?user_id=alex&phase=EVT&project=warehouse_robot_v2")
     assert digest.status_code == 200
     assert digest.json()["user_id"] == "alex"
+
+
+def test_events_response_exposes_relevance_metadata(monkeypatch):
+    source_event = CommunicationEvent(
+        id="slack_ack_1",
+        source_type=SourceType.SLACK,
+        source_ref="#warehouse-robot-v2",
+        author_name="Alex",
+        text="Acknowledged.",
+        timestamp=datetime(2026, 5, 16, tzinfo=timezone.utc),
+        project="warehouse_robot_v2",
+    )
+
+    monkeypatch.setattr(
+        "app.main.IngestionService.fetch_all",
+        lambda self: [source_event],
+    )
+    monkeypatch.setattr("app.main.load_added_events", lambda: [])
+
+    client = TestClient(app)
+    sync = client.post("/sync").json()
+    assert sync["ignored_events"] == 1
+    assert sync["skipped_irrelevant"] == 1
+
+    events = client.get("/events?project=warehouse_robot_v2").json()
+    assert events[0]["is_relevant"] is False
+    assert events[0]["relevance_score"] == 0.05
+    assert events[0]["relevance_reason"] == "short acknowledgement"
+    assert events[0]["relevance_category"] == "acknowledgement"

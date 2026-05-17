@@ -44,7 +44,7 @@ export default function Home() {
 
   async function sync() {
     const result = await api.sync();
-    setStatus(`Synced ${result.events} events into ${result.entities} project entities`);
+    setStatus(`Synced ${result.events} events (${result.ignored_events} ignored) into ${result.entities} project entities`);
     await refresh();
   }
 

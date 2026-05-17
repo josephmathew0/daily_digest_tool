@@ -1,10 +1,12 @@
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.database.repository import (
     entity_fingerprint,
@@ -18,12 +20,37 @@ from app.database.repository import (
 from app.models.communication_event import CommunicationEvent
 from app.services.digest_generator import DigestGenerator
 from app.services.ingestion_service import IngestionService
+from app.services.relevance_filter import RelevanceFilter
 from app.services.state_tracker import StateTracker
 
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 ADDED_EVENTS_PATH = DATA_DIR / "added_events.json"
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+DIGEST_CACHE_VERSION = "digest_v3"
+
+
+class EventResponse(BaseModel):
+    id: str
+    source_type: str
+    source_ref: str
+    author_name: str | None = None
+    author_email: str | None = None
+    author_role: str | None = None
+    title: str | None = None
+    text: str
+    timestamp: str
+    channel: str | None = None
+    thread_id: str | None = None
+    recipients: list[str]
+    attendees: list[str]
+    reactions: list[str]
+    project: str
+    metadata: dict
+    is_relevant: bool
+    relevance_score: float
+    relevance_reason: str
+    relevance_category: str
 
 
 @asynccontextmanager
@@ -58,12 +85,42 @@ def all_events() -> list[CommunicationEvent]:
         return events
 
     source_events = sorted(IngestionService().fetch_all() + load_added_events(), key=lambda event: event.timestamp)
+    source_events = RelevanceFilter().annotate_many(source_events)
     upsert_events(source_events)
     return list_events()
 
 
 def all_entities():
     return StateTracker().build_entities(all_events())
+
+
+def event_response(event: CommunicationEvent) -> EventResponse:
+    relevance_filter = RelevanceFilter()
+    relevance = event.metadata.get("relevance")
+    if not isinstance(relevance, dict):
+        relevance = relevance_filter.assess(event).to_metadata()
+    return EventResponse(
+        id=event.id,
+        source_type=event.source_type.value,
+        source_ref=event.source_ref,
+        author_name=event.author_name,
+        author_email=event.author_email,
+        author_role=event.author_role,
+        title=event.title,
+        text=event.text,
+        timestamp=event.timestamp.isoformat(),
+        channel=event.channel,
+        thread_id=event.thread_id,
+        recipients=event.recipients,
+        attendees=event.attendees,
+        reactions=event.reactions,
+        project=event.project,
+        metadata=event.metadata,
+        is_relevant=bool(relevance.get("is_relevant")),
+        relevance_score=float(relevance.get("score", 0.0)),
+        relevance_reason=str(relevance.get("reason", "not assessed")),
+        relevance_category=str(relevance.get("category", "unknown")),
+    )
 
 
 @app.get("/health")
@@ -85,11 +142,12 @@ def get_projects():
 def get_events(project: str | None = None):
     if not list_events():
         all_events()
-    return list_events(project)
+    return [event_response(event) for event in list_events(project)]
 
 
 @app.post("/events")
 def add_event(event: CommunicationEvent):
+    event = RelevanceFilter().annotate(event)
     current = [item.model_dump(mode="json") for item in load_added_events()]
     current.append(event.model_dump(mode="json"))
     ADDED_EVENTS_PATH.write_text(json.dumps(current, indent=2))
@@ -100,16 +158,21 @@ def add_event(event: CommunicationEvent):
 @app.post("/sync")
 def sync_sources():
     events = sorted(IngestionService().fetch_all() + load_added_events(), key=lambda event: event.timestamp)
+    relevance_filter = RelevanceFilter()
+    events = relevance_filter.annotate_many(events)
     stats = upsert_events(events)
     events = list_events()
     tracker = StateTracker()
     entities = tracker.build_entities(events)
     return {
         "events": len(events),
+        "relevant_events": sum(1 for event in events if relevance_filter.is_relevant(event)),
+        "ignored_events": sum(1 for event in events if not relevance_filter.is_relevant(event)),
         "entities": len(entities),
         **stats,
         "extracted": tracker.last_stats["extracted"],
         "reused_extractions": tracker.last_stats["reused"],
+        "skipped_irrelevant": tracker.last_stats["skipped_irrelevant"],
     }
 
 
@@ -126,7 +189,12 @@ def get_digest(user_id: str, phase: str = "prototype", project: str = "warehouse
             entity for entity in all_entities()
             if any(event.id in entity.supporting_events and event.project == project for event in all_events())
         ]
-    fingerprint = entity_fingerprint(entities)
+    fingerprint = ":".join([
+        entity_fingerprint(entities),
+        os.getenv("SUMMARY_MODE", "rules"),
+        os.getenv("OPENAI_MODEL", ""),
+        DIGEST_CACHE_VERSION,
+    ])
     cached = get_cached_digest(project, user_id, phase, fingerprint)
     if cached:
         return cached

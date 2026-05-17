@@ -18,11 +18,17 @@ export type EventPayload = {
   source_type: "slack" | "email" | "meeting";
   source_ref: string;
   author_name?: string;
+  author_email?: string;
   author_role?: string;
   title?: string;
   text: string;
   timestamp: string;
   project: string;
+  metadata?: Record<string, unknown>;
+  is_relevant?: boolean;
+  relevance_score?: number;
+  relevance_reason?: string;
+  relevance_category?: string;
 };
 
 export type DigestItem = {
@@ -71,7 +77,7 @@ export const api = {
   users: () => request<User[]>("/users"),
   projects: () => request<Project[]>("/projects"),
   events: (project: string) => request<EventPayload[]>(`/events?project=${project}`),
-  sync: () => request<{ events: number; entities: number }>("/sync", { method: "POST" }),
+  sync: () => request<{ events: number; relevant_events: number; ignored_events: number; entities: number }>("/sync", { method: "POST" }),
   digest: (project: string, userId: string, phase: string) =>
     request<Digest>(`/digest?project=${project}&user_id=${userId}&phase=${phase}`),
   addEvent: (event: EventPayload) =>

@@ -4,6 +4,7 @@ from app.models.digest import DigestItem, DigestResponse
 from app.models.entities import ProjectEntity
 from app.models.enums import EntityType
 from app.services.relevance_engine import RelevanceEngine
+from app.services.summary.factory import build_summary_provider
 
 
 SECTION_NAMES = {
@@ -19,6 +20,7 @@ SECTION_NAMES = {
 class DigestGenerator:
     def __init__(self) -> None:
         self.relevance = RelevanceEngine()
+        self.summary_provider = build_summary_provider()
 
     def generate(self, *, project: str, user: dict, phase: str, entities: list[ProjectEntity]) -> DigestResponse:
         sections: dict[str, list[DigestItem]] = defaultdict(list)
@@ -42,14 +44,6 @@ class DigestGenerator:
             user_name=user["name"],
             role=user["role"],
             phase=phase,
-            team_summary=self._team_summary(entities),
+            team_summary=self.summary_provider.team_summary(entities, phase),
             sections=sorted_sections,
-        )
-
-    def _team_summary(self, entities: list[ProjectEntity]) -> str:
-        unresolved = [item for item in entities if item.status.value != "resolved"]
-        critical = [item for item in unresolved if item.severity.value in {"high", "critical"}]
-        return (
-            f"{len(unresolved)} active execution items are tracked across the project. "
-            f"{len(critical)} are high-impact blockers or risks that need attention before the next milestone."
         )
