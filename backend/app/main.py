@@ -28,7 +28,7 @@ from app.services.state_tracker import StateTracker
 DATA_DIR = Path(__file__).resolve().parent / "data"
 ADDED_EVENTS_PATH = DATA_DIR / "added_events.json"
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-DIGEST_CACHE_VERSION = "digest_v5"
+DIGEST_CACHE_VERSION = "digest_v7"
 LAST_SYNC_STATUS: dict = {
     "last_sync_at": None,
     "events": 0,
@@ -149,6 +149,22 @@ def event_response(event: CommunicationEvent) -> EventResponse:
     )
 
 
+def persisted_status_counts() -> dict:
+    relevance_filter = RelevanceFilter()
+    events = list_events()
+    entities = list_project_entities()
+    return {
+        "last_sync_at": LAST_SYNC_STATUS["last_sync_at"],
+        "events": len(events),
+        "relevant_events": sum(1 for event in events if relevance_filter.is_relevant(event)),
+        "ignored_events": sum(1 for event in events if not relevance_filter.is_relevant(event)),
+        "entities": len(entities),
+        "extracted": LAST_SYNC_STATUS["extracted"],
+        "reused_extractions": LAST_SYNC_STATUS["reused_extractions"],
+        "skipped_irrelevant": LAST_SYNC_STATUS["skipped_irrelevant"],
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -173,12 +189,13 @@ def get_events(project: str | None = None):
 
 @app.get("/system-status")
 def get_system_status():
+    status = LAST_SYNC_STATUS if LAST_SYNC_STATUS["last_sync_at"] else persisted_status_counts()
     return SystemStatusResponse(
         summary_mode=os.getenv("SUMMARY_MODE", "rules"),
         extraction_mode=os.getenv("EXTRACTION_MODE", "rules"),
         openai_model=os.getenv("OPENAI_MODEL"),
         openai_configured=bool(os.getenv("OPENAI_API_KEY")),
-        **LAST_SYNC_STATUS,
+        **status,
     )
 
 

@@ -17,9 +17,12 @@ The core idea is entity-centric memory. Slack and email are evidence sources; th
 - Hash-based extraction cache to avoid reprocessing unchanged events
 - Relevance filtering for low-value messages and account/marketing emails
 - UI visibility for ignored source events and relevance reasons
+- UI system status for modes, persisted counts, last sync time, and digest generation time
 - Rule-based extraction by default
 - Rule-based entity lifecycle tracking for resolved, still-blocked, and updated items
+- Lifecycle-aware digest ordering: blocked, pending, and active items before resolved items
 - Optional OpenAI summaries through `SUMMARY_MODE=openai`
+- Optional hybrid OpenAI extraction for relevant, uncertain events
 - OpenAI fallback behavior so API failures do not break the app
 - Hybrid extraction infrastructure for future LLM-assisted extraction
 - GitHub Actions CI for backend tests, frontend build, and Compose validation
@@ -188,6 +191,17 @@ OPENAI_API_KEY=your_api_key_here
 
 The app has fallback behavior. If the API key, model, quota, or network is unavailable, the backend falls back to rule-based summaries or extraction instead of failing the request.
 
+For hybrid extraction demos:
+
+```env
+EXTRACTION_MODE=hybrid
+SUMMARY_MODE=rules
+OPENAI_MODEL=gpt-5-mini
+OPENAI_API_KEY=your_api_key_here
+```
+
+Hybrid extraction runs rules first and only uses OpenAI when the rule result is missing or low-confidence. Extraction results are cached by event hash, mode, version, and model.
+
 ## Common Commands
 
 Backend tests:
@@ -252,6 +266,9 @@ The prototype is designed to demonstrate:
 - Human-readable relevance explanations
 - Optional OpenAI usage with fallback
 - State changes that update existing project entities instead of only appending messages
+- Hybrid LLM extraction for ambiguous but relevant communication events
+- Lifecycle-aware ordering so active operational work appears before resolved items
+- Persisted status counts after backend restart, so the UI does not show zero events when SQLite already has data
 - Role-aware digest generation
 - CI-backed tests and build checks
 

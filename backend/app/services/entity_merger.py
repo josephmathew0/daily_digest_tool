@@ -15,7 +15,7 @@ TITLE_OVERLAP_THRESHOLD = 0.55
 
 COMPATIBLE_TYPES = {
     EntityType.ISSUE: {EntityType.ISSUE, EntityType.RISK, EntityType.DEPENDENCY, EntityType.MILESTONE},
-    EntityType.RISK: {EntityType.ISSUE, EntityType.RISK, EntityType.DEPENDENCY, EntityType.MILESTONE},
+    EntityType.RISK: {EntityType.ISSUE, EntityType.RISK, EntityType.DEPENDENCY, EntityType.ACTION_ITEM, EntityType.MILESTONE},
     EntityType.DEPENDENCY: {EntityType.ISSUE, EntityType.RISK, EntityType.DEPENDENCY, EntityType.ACTION_ITEM},
     EntityType.ACTION_ITEM: {EntityType.ACTION_ITEM, EntityType.DEPENDENCY},
     EntityType.DECISION: {EntityType.DECISION},
@@ -27,8 +27,12 @@ RESOLVED_SIGNALS = [
     "can resume",
     "closed",
     "fixed",
+    "looks acceptable",
+    "no longer blocking",
     "resolved",
+    "testing can resume",
     "unblocked",
+    "validation can resume",
     "validated",
 ]
 
@@ -61,9 +65,12 @@ DOMAIN_TERMS = {
     "pcb",
     "po",
     "procurement",
+    "reliability",
     "supplier",
+    "testing",
     "thermal",
     "tolerance",
+    "validation",
     "vendor",
 }
 
@@ -76,8 +83,11 @@ DOMAIN_GROUPS = {
         "firmware",
         "motor mount",
         "pcb",
+        "reliability",
+        "testing",
         "thermal",
         "tolerance",
+        "validation",
     },
     "procurement": {
         "bom",
@@ -135,6 +145,8 @@ class EntityMerger:
                 continue
             if not self._domain_compatible(candidate, entity):
                 continue
+            if self._is_resolution_update(entity) and self._domain_overlap(candidate, entity) >= 2:
+                return candidate
             if self._keyword_overlap(candidate, entity) >= KEYWORD_OVERLAP_THRESHOLD:
                 return candidate
             if self._title_overlap(candidate.title, entity.title) >= TITLE_OVERLAP_THRESHOLD:
@@ -199,6 +211,13 @@ class EntityMerger:
     def _domain_terms(self, entity: ProjectEntity) -> set[str]:
         text = f"{entity.title} {entity.summary} {' '.join(entity.keywords)}".lower()
         return {term for term in DOMAIN_TERMS if term in text}
+
+    def _domain_overlap(self, first: ProjectEntity, second: ProjectEntity) -> int:
+        return len(self._domain_terms(first) & self._domain_terms(second))
+
+    def _is_resolution_update(self, entity: ProjectEntity) -> bool:
+        text = f"{entity.title} {entity.summary}".lower()
+        return entity.status == EntityStatus.RESOLVED or any(signal in text for signal in RESOLVED_SIGNALS)
 
     def _dominant_domain_group(self, terms: set[str]) -> str | None:
         scores = {

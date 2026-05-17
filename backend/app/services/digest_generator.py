@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from app.models.digest import DigestItem, DigestResponse
 from app.models.entities import ProjectEntity
-from app.models.enums import EntityType
+from app.models.enums import EntityStatus, EntityType
 from app.services.relevance_engine import RelevanceEngine
 from app.services.summary.factory import build_summary_provider
 
@@ -36,7 +36,7 @@ class DigestGenerator:
             sections[SECTION_NAMES[entity.entity_type]].append(item)
 
         sorted_sections = {
-            name: sorted(items, key=lambda item: item.score, reverse=True)[:6]
+            name: sorted(items, key=self._sort_key)[:6]
             for name, items in sections.items()
         }
         return DigestResponse(
@@ -50,3 +50,12 @@ class DigestGenerator:
             cache_hit=False,
             sections=sorted_sections,
         )
+
+    def _sort_key(self, item: DigestItem) -> tuple[int, float]:
+        lifecycle_rank = {
+            EntityStatus.BLOCKED: 0,
+            EntityStatus.PENDING: 1,
+            EntityStatus.ACTIVE: 2,
+            EntityStatus.RESOLVED: 3,
+        }
+        return (lifecycle_rank.get(item.entity.status, 2), -item.score)

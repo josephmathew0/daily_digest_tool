@@ -30,6 +30,8 @@ Open http://localhost:3000.
    - Team-wide summary
    - Role-specific digest sections
    - Severity/status/score badges
+   - Section ordering: blocked, pending, and active items appear before resolved items; score orders items within each lifecycle group
+   - Status strip: summary mode, extraction mode, model, persisted event/entity counts, last sync time, and digest generated time
    - Source Evidence
    - Ignored source events and reasons
 
@@ -147,11 +149,52 @@ Switch back after the demo:
 SUMMARY_MODE=rules
 ```
 
+## Hybrid LLM Extraction Demo
+
+Only use this when you want to spend API credits. Keep this off for normal development.
+
+Set:
+
+```env
+EXTRACTION_MODE=hybrid
+SUMMARY_MODE=rules
+OPENAI_MODEL=gpt-5-mini
+```
+
+Restart:
+
+```bash
+docker compose down
+docker compose up --build
+```
+
+Send this Slack message:
+
+```text
+The latest thermal chamber run looks acceptable after firmware current limiting. Alex says EVT reliability validation can resume tomorrow.
+```
+
+Expected behavior after **Sync Sources**:
+
+- The app should use rules first.
+- Because the wording is more ambiguous than a direct `resolved` message, hybrid mode may use OpenAI extraction.
+- The thermal/PCB reliability item should move toward `resolved` or appear as a resolved thermal risk update.
+- The extraction cache should prevent repeated OpenAI calls for the same unchanged message.
+
+Switch back after the demo:
+
+```env
+EXTRACTION_MODE=rules
+```
+
 ## Reviewer Talking Points
 
 - The app normalizes Slack, Gmail, mock data, and manual entries into the same event shape.
 - Relevance filtering happens before extraction to reduce noise and future LLM cost.
 - Extraction and digest results are cached using hashes and fingerprints.
 - OpenAI is optional and has rule-based fallback behavior.
+- Hybrid extraction calls OpenAI only for relevant, uncertain events and caches the result.
+- Digest sections are lifecycle-aware: unresolved operational work appears before recently resolved items.
+- After a Docker restart, the status strip derives event/entity counts from SQLite even before the first sync in that process.
 - The UI exposes ignored events so filtering is explainable.
 - The project demonstrates an architecture path toward production, even though it intentionally remains a local prototype.

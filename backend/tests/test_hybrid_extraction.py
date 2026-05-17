@@ -5,6 +5,7 @@ from app.models.entities import ProjectEntity
 from app.models.enums import EntityStatus, EntityType, Severity, SourceType
 from app.services.extraction.base import ExtractionProvider
 from app.services.extraction.hybrid_provider import HybridExtractionProvider
+from app.services.extraction.openai_provider import ExtractionResponse, ExtractedEntity, OpenAIExtractionProvider
 
 
 def event() -> CommunicationEvent:
@@ -79,3 +80,59 @@ def test_hybrid_calls_openai_when_rules_are_uncertain():
     assert result == openai.entities
     assert rules.calls == 1
     assert openai.calls == 1
+
+
+class FakeResponses:
+    def __init__(self, parsed: ExtractionResponse) -> None:
+        self.parsed = parsed
+        self.kwargs = None
+
+    def parse(self, **kwargs):
+        self.kwargs = kwargs
+        return type("Response", (), {"output_parsed": self.parsed})()
+
+
+class FakeOpenAIClient:
+    def __init__(self, parsed: ExtractionResponse) -> None:
+        self.responses = FakeResponses(parsed)
+
+
+def test_openai_extraction_provider_uses_responses_api_for_ambiguous_resolution():
+    parsed = ExtractionResponse(
+        is_relevant=True,
+        entities=[
+            ExtractedEntity(
+                entity_type=EntityType.RISK,
+                title="PCB thermal risk",
+                summary="Thermal chamber run looks acceptable after firmware current limiting; EVT reliability validation can resume.",
+                status=EntityStatus.RESOLVED,
+                severity=Severity.MEDIUM,
+                confidence_score=0.86,
+                owner="Alex",
+                affected_roles=["electrical_engineer"],
+                keywords=["pcb", "thermal", "firmware"],
+            )
+        ],
+    )
+    provider = OpenAIExtractionProvider.__new__(OpenAIExtractionProvider)
+    provider.model_name = "test-model"
+    provider.client = FakeOpenAIClient(parsed)
+
+    result = provider.extract(
+        CommunicationEvent(
+            id="thermal_resolution",
+            source_type=SourceType.SLACK,
+            source_ref="#warehouse-robot-v2",
+            author_name="Alex",
+            text="The latest thermal chamber run looks acceptable after firmware current limiting. Alex says EVT reliability validation can resume tomorrow.",
+            timestamp=datetime(2026, 5, 17, tzinfo=timezone.utc),
+            project="warehouse_robot_v2",
+        )
+    )
+
+    assert result[0].status == EntityStatus.RESOLVED
+    assert result[0].resolved_at == datetime(2026, 5, 17, tzinfo=timezone.utc)
+    assert result[0].keywords == ["firmware", "pcb", "thermal"]
+    assert provider.client.responses.kwargs["text_format"] == ExtractionResponse
+    assert provider.client.responses.kwargs["reasoning"] == {"effort": "minimal"}
+    assert provider.client.responses.kwargs["max_output_tokens"] == 1200

@@ -35,32 +35,33 @@ class OpenAIExtractionProvider(ExtractionProvider):
     def __init__(self) -> None:
         from openai import OpenAI
 
-        self.model_name = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+        self.model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini")
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def extract(self, event: CommunicationEvent) -> list[ProjectEntity]:
-        response = self.client.chat.completions.parse(
+        response = self.client.responses.parse(
             model=self.model_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You extract execution intelligence for robotics hardware engineering teams. "
-                        "Return only project-relevant entities. Ignore acknowledgements, greetings, "
-                        "marketing/system emails, and generic notifications. Entities must be one of: "
-                        "issue, risk, decision, dependency, action_item, milestone. Evidence messages are "
-                        "not the entity; the entity is the durable project state implied by the message."
-                    ),
-                },
+            instructions=(
+                "You extract execution intelligence for robotics hardware engineering teams. "
+                "Return only project-relevant entities. Ignore acknowledgements, greetings, "
+                "marketing/system emails, and generic notifications. Entities must be one of: "
+                "issue, risk, decision, dependency, action_item, milestone. Evidence messages are "
+                "not the entity; the entity is the durable project state implied by the message. "
+                "If the text indicates testing can resume, validation passed, or a risk is no longer blocking, "
+                "mark the relevant entity resolved."
+            ),
+            input=[
                 {
                     "role": "user",
                     "content": self._event_prompt(event),
                 },
             ],
-            response_format=ExtractionResponse,
+            text_format=ExtractionResponse,
+            reasoning={"effort": "minimal"},
+            max_output_tokens=1200,
         )
 
-        parsed = response.choices[0].message.parsed
+        parsed = response.output_parsed
         if not parsed or not parsed.is_relevant:
             return []
 

@@ -226,3 +226,33 @@ def test_single_shared_bracket_keyword_does_not_bridge_connector_and_procurement
     merged = EntityMerger().merge([connector_dependency, bracket_resolution])
 
     assert len(merged) == 2
+
+
+def test_acceptable_thermal_run_resolves_related_reliability_risk():
+    original = make_entity(
+        entity_id="risk_thermal",
+        title="Warehouse Robot V2 PCB thermal risk follow-up",
+        summary="PCB thermal rise is still 12C over target during the warehouse robot drive cycle. EVT reliability remains at risk.",
+        keywords=["pcb", "thermal", "reliability"],
+        event_id="event_1",
+        updated_hour=9,
+        status=EntityStatus.PENDING,
+    )
+    resolution = make_entity(
+        entity_id="action_resume_validation",
+        title="Resume EVT reliability validation",
+        summary="The latest thermal chamber run looks acceptable after firmware current limiting. Alex says EVT reliability validation can resume tomorrow.",
+        keywords=["thermal", "firmware", "reliability", "validation"],
+        event_id="event_2",
+        updated_hour=11,
+        status=EntityStatus.RESOLVED,
+        entity_type=EntityType.ACTION_ITEM,
+    )
+
+    merged = EntityMerger().merge([original, resolution])
+
+    assert len(merged) == 1
+    assert merged[0].entity_type == EntityType.RISK
+    assert merged[0].status == EntityStatus.RESOLVED
+    assert merged[0].summary == resolution.summary
+    assert merged[0].supporting_events == ["event_1", "event_2"]

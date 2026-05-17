@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.main import app
+import app.main as main_module
+from app.database.repository import list_events, list_project_entities
 from app.models.communication_event import CommunicationEvent
 from app.models.enums import SourceType
 
@@ -84,3 +86,48 @@ def test_events_response_exposes_relevance_metadata(monkeypatch):
     assert events[0]["relevance_score"] == 0.05
     assert events[0]["relevance_reason"] == "short acknowledgement"
     assert events[0]["relevance_category"] == "acknowledgement"
+
+
+def test_system_status_derives_persisted_counts_after_restart(monkeypatch):
+    source_event = CommunicationEvent(
+        id="slack_restart_1",
+        source_type=SourceType.SLACK,
+        source_ref="#warehouse-robot-v2",
+        author_name="Alex",
+        text="PCB thermal rise is 12C over target and EVT reliability remains at risk.",
+        timestamp=datetime(2026, 5, 16, tzinfo=timezone.utc),
+        project="warehouse_robot_v2",
+    )
+
+    monkeypatch.setattr(
+        "app.main.IngestionService.fetch_all",
+        lambda self: [source_event],
+    )
+    monkeypatch.setattr("app.main.load_added_events", lambda: [])
+
+    client = TestClient(app)
+    client.post("/sync")
+
+    assert len(list_events()) == 1
+    assert len(list_project_entities()) == 1
+
+    main_module.LAST_SYNC_STATUS.update(
+        {
+            "last_sync_at": None,
+            "events": 0,
+            "relevant_events": 0,
+            "ignored_events": 0,
+            "entities": 0,
+            "extracted": 0,
+            "reused_extractions": 0,
+            "skipped_irrelevant": 0,
+        }
+    )
+
+    status = client.get("/system-status").json()
+
+    assert status["last_sync_at"] is None
+    assert status["events"] == 1
+    assert status["relevant_events"] == 1
+    assert status["ignored_events"] == 0
+    assert status["entities"] == 1
