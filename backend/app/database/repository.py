@@ -350,19 +350,22 @@ def get_cached_digest(project: str, user_id: str, phase: str, fingerprint: str) 
     key = digest_cache_key(project, user_id, phase, fingerprint)
     with connection() as conn:
         row = conn.execute(
-            "SELECT digest_json FROM digest_cache WHERE cache_key = ?",
+            "SELECT digest_json, created_at FROM digest_cache WHERE cache_key = ?",
             (key,),
         ).fetchone()
     if not row:
         return None
-    return DigestResponse.model_validate(json.loads(row["digest_json"]))
+    digest = DigestResponse.model_validate(json.loads(row["digest_json"]))
+    if not digest.generated_at:
+        digest = digest.model_copy(update={"generated_at": row["created_at"]})
+    return digest.model_copy(update={"cache_hit": True})
 
 
 def save_digest(project: str, user_id: str, phase: str, fingerprint: str, digest: DigestResponse) -> None:
     init_db()
     key = digest_cache_key(project, user_id, phase, fingerprint)
     now = datetime.now(timezone.utc).isoformat()
-    digest_json = json.dumps(digest.model_dump(mode="json"))
+    digest_json = json.dumps(digest.model_copy(update={"cache_hit": False}).model_dump(mode="json"))
     with connection() as conn:
         existing = conn.execute(
             "SELECT created_at FROM digest_cache WHERE cache_key = ?",

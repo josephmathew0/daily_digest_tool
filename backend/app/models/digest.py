@@ -17,4 +17,6 @@ class DigestResponse(BaseModel):
     role: str
     phase: str
     team_summary: str
+    generated_at: str | None = None
+    cache_hit: bool = False
     sections: dict[str, list[DigestItem]]

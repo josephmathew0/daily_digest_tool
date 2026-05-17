@@ -97,6 +97,23 @@ Expected behavior:
 - Owner and deadline language should influence digest relevance
 - Mechanical and electrical roles should both have some relevance
 
+## Lifecycle Update Test
+
+Send this message in the Slack project channel:
+
+```text
+Update: Priya released the aluminum bracket PO after confirming the final BOM. The supplier confirmed the inventory slot, so the bracket procurement action item is resolved.
+```
+
+Expected behavior after **Sync Sources**:
+
+- `Waiting on finalized BOM before placing bracket order` should become `resolved`
+- The card should show a `Resolved` timestamp
+- `Connector clearance depends on final motor mount CAD` should remain `blocked`
+- The bracket update should not overwrite the connector/CAD dependency summary
+
+This demonstrates entity lifecycle tracking: the system updates the durable project state instead of only adding a new message.
+
 ## OpenAI Summary Demo
 
 Only use this when you want to spend API credits.

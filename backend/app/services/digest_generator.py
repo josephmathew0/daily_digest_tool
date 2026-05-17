@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from app.models.digest import DigestItem, DigestResponse
 from app.models.entities import ProjectEntity
@@ -45,5 +46,7 @@ class DigestGenerator:
             role=user["role"],
             phase=phase,
             team_summary=self.summary_provider.team_summary(entities, phase),
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            cache_hit=False,
             sections=sorted_sections,
         )

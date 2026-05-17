@@ -14,11 +14,12 @@ def make_entity(
     event_id: str,
     updated_hour: int,
     status: EntityStatus = EntityStatus.ACTIVE,
+    entity_type: EntityType = EntityType.RISK,
 ) -> ProjectEntity:
     timestamp = datetime(2026, 5, 16, updated_hour, tzinfo=timezone.utc)
     return ProjectEntity(
         id=entity_id,
-        entity_type=EntityType.RISK,
+        entity_type=entity_type,
         title=title,
         summary=summary,
         status=status,
@@ -79,5 +80,149 @@ def test_keeps_unrelated_entities_separate():
     )
 
     merged = EntityMerger().merge([thermal, bracket])
+
+    assert len(merged) == 2
+
+
+def test_resolved_update_marks_existing_related_risk_resolved():
+    original = make_entity(
+        entity_id="risk_thermal",
+        title="PCB thermal risk",
+        summary="PCB thermal rise is above EVT target and reliability is at risk.",
+        keywords=["pcb", "thermal", "firmware"],
+        event_id="event_1",
+        updated_hour=9,
+        status=EntityStatus.BLOCKED,
+    )
+    resolved = make_entity(
+        entity_id="issue_thermal_resolved",
+        title="PCB thermal issue is resolved",
+        summary="PCB thermal issue is resolved after firmware current limiting. EVT reliability validation can resume.",
+        keywords=["pcb", "thermal", "firmware"],
+        event_id="event_2",
+        updated_hour=11,
+        status=EntityStatus.RESOLVED,
+        entity_type=EntityType.ISSUE,
+    )
+
+    merged = EntityMerger().merge([original, resolved])
+
+    assert len(merged) == 1
+    assert merged[0].entity_type == EntityType.RISK
+    assert merged[0].status == EntityStatus.RESOLVED
+    assert merged[0].resolved_at == resolved.updated_at
+    assert merged[0].summary == resolved.summary
+    assert merged[0].supporting_events == ["event_1", "event_2"]
+
+
+def test_still_blocked_update_does_not_mark_existing_risk_resolved():
+    original = make_entity(
+        entity_id="risk_connector",
+        title="Connector clearance is blocked",
+        summary="Connector clearance is blocked by motor mount CAD.",
+        keywords=["connector", "motor mount", "cad"],
+        event_id="event_1",
+        updated_hour=9,
+        status=EntityStatus.BLOCKED,
+    )
+    still_blocked = make_entity(
+        entity_id="risk_connector_later",
+        title="Connector clearance remains blocked",
+        summary="Connector clearance still blocked until the revised motor mount CAD is validated.",
+        keywords=["connector", "motor mount", "cad"],
+        event_id="event_2",
+        updated_hour=11,
+        status=EntityStatus.BLOCKED,
+    )
+
+    merged = EntityMerger().merge([original, still_blocked])
+
+    assert len(merged) == 1
+    assert merged[0].status == EntityStatus.BLOCKED
+    assert merged[0].resolved_at is None
+    assert merged[0].summary == still_blocked.summary
+
+
+def test_milestone_resolution_can_close_related_risk():
+    original = make_entity(
+        entity_id="risk_thermal",
+        title="PCB thermal risk",
+        summary="PCB thermal rise is above EVT target and reliability is at risk.",
+        keywords=["pcb", "thermal", "firmware"],
+        event_id="event_1",
+        updated_hour=9,
+        status=EntityStatus.BLOCKED,
+    )
+    resolved_milestone = make_entity(
+        entity_id="milestone_thermal_resolved",
+        title="EVT reliability validation can resume",
+        summary="PCB thermal issue is resolved after firmware current limiting. EVT reliability validation can resume.",
+        keywords=["pcb", "thermal", "firmware"],
+        event_id="event_2",
+        updated_hour=11,
+        status=EntityStatus.RESOLVED,
+        entity_type=EntityType.MILESTONE,
+    )
+
+    merged = EntityMerger().merge([original, resolved_milestone])
+
+    assert len(merged) == 1
+    assert merged[0].entity_type == EntityType.RISK
+    assert merged[0].status == EntityStatus.RESOLVED
+
+
+def test_procurement_resolution_does_not_close_connector_dependency():
+    connector_dependency = make_entity(
+        entity_id="dependency_connector",
+        title="Connector clearance depends on final motor mount CAD",
+        summary="Connector clearance is blocked pending final motor mount CAD validation.",
+        keywords=["connector", "motor mount", "cad"],
+        event_id="event_1",
+        updated_hour=9,
+        status=EntityStatus.BLOCKED,
+        entity_type=EntityType.DEPENDENCY,
+    )
+    bracket_resolution = make_entity(
+        entity_id="action_bracket_resolved",
+        title="Bracket PO is resolved",
+        summary="Priya released the aluminum bracket PO after confirming the final BOM. The supplier confirmed the inventory slot, so the bracket procurement action item is resolved.",
+        keywords=["bracket", "bom", "supplier"],
+        event_id="event_2",
+        updated_hour=11,
+        status=EntityStatus.RESOLVED,
+        entity_type=EntityType.ACTION_ITEM,
+    )
+
+    merged = EntityMerger().merge([connector_dependency, bracket_resolution])
+
+    assert len(merged) == 2
+    by_id = {entity.id: entity for entity in merged}
+    assert by_id["dependency_connector"].status == EntityStatus.BLOCKED
+    assert by_id["action_bracket_resolved"].status == EntityStatus.RESOLVED
+
+
+def test_single_shared_bracket_keyword_does_not_bridge_connector_and_procurement():
+    connector_dependency = make_entity(
+        entity_id="dependency_connector",
+        title="Connector clearance depends on final motor mount CAD",
+        summary="Connector clearance depends on final motor mount CAD. EE cannot freeze wiring harness until Maya confirms bracket location.",
+        keywords=["motor mount", "cad", "connector", "bracket"],
+        event_id="event_1",
+        updated_hour=9,
+        status=EntityStatus.BLOCKED,
+        entity_type=EntityType.DEPENDENCY,
+    )
+    bracket_resolution = make_entity(
+        entity_id="action_bracket_resolved",
+        title="Bracket PO is resolved",
+        summary="Priya released the aluminum bracket PO after confirming the final BOM. The supplier confirmed the inventory slot, so the bracket procurement action item is resolved.",
+        keywords=["bom", "bracket"],
+        event_id="event_2",
+        updated_hour=11,
+        status=EntityStatus.RESOLVED,
+        entity_type=EntityType.ACTION_ITEM,
+    )
+
+    merged = EntityMerger().merge([connector_dependency, bracket_resolution])
 
     assert len(merged) == 2
