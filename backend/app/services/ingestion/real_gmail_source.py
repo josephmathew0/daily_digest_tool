@@ -25,6 +25,8 @@ class RealGmailSource(CommunicationSource):
         self.lookback_days = int(os.getenv("EMAIL_LOOKBACK_DAYS", "14"))
         self.include_sent = os.getenv("EMAIL_INCLUDE_SENT", "true").lower() == "true"
         self.token_path = BASE_DIR / os.getenv("GMAIL_TOKEN_PATH", "gmail_token.json")
+        self.require_label = os.getenv("EMAIL_REQUIRE_LABEL", "false").lower() == "true"
+        self.gmail_label = os.getenv("EMAIL_GMAIL_LABEL", "EverCurrent/Warehouse-Robot-V2")
         self.project_terms = self._csv(
             os.getenv(
                 "EMAIL_PROJECT_TERMS",
@@ -58,7 +60,10 @@ class RealGmailSource(CommunicationSource):
         return credentials
 
     def _fetch_query(self, service, label_query: str, direction: str) -> list[CommunicationEvent]:
-        query = f"{label_query} newer_than:{self.lookback_days}d"
+        query_parts = [label_query, f"newer_than:{self.lookback_days}d"]
+        if self.require_label:
+            query_parts.append(f'label:"{self.gmail_label}"')
+        query = " ".join(query_parts)
         response = service.users().messages().list(userId="me", q=query, maxResults=50).execute()
         messages = response.get("messages", [])
         events: list[CommunicationEvent] = []
