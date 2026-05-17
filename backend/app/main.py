@@ -1,11 +1,20 @@
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database.repository import init_db, list_events, upsert_events
+from app.database.repository import (
+    entity_fingerprint,
+    get_cached_digest,
+    init_db,
+    list_events,
+    list_project_entities,
+    save_digest,
+    upsert_events,
+)
 from app.models.communication_event import CommunicationEvent
 from app.services.digest_generator import DigestGenerator
 from app.services.ingestion_service import IngestionService
@@ -16,7 +25,14 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 ADDED_EVENTS_PATH = DATA_DIR / "added_events.json"
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-app = FastAPI(title="EverCurrent Daily Digest API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="EverCurrent Daily Digest API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://frontend:3000"],
@@ -24,11 +40,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
 
 
 def load_json(name: str):
@@ -109,5 +120,17 @@ def get_digest(user_id: str, phase: str = "prototype", project: str = "warehouse
     if not user:
         raise HTTPException(status_code=404, detail="Unknown user")
 
-    entities = [entity for entity in all_entities() if project in entity.id or True]
-    return DigestGenerator().generate(project=project, user=user, phase=phase, entities=entities)
+    entities = list_project_entities(project)
+    if not entities:
+        entities = [
+            entity for entity in all_entities()
+            if any(event.id in entity.supporting_events and event.project == project for event in all_events())
+        ]
+    fingerprint = entity_fingerprint(entities)
+    cached = get_cached_digest(project, user_id, phase, fingerprint)
+    if cached:
+        return cached
+
+    digest = DigestGenerator().generate(project=project, user=user, phase=phase, entities=entities)
+    save_digest(project, user_id, phase, fingerprint, digest)
+    return digest
