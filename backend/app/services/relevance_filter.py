@@ -5,6 +5,9 @@ from app.models.communication_event import CommunicationEvent
 from app.models.enums import SourceType
 
 
+# Relevance filtering runs before extraction. It keeps raw events in the
+# database for auditability while preventing acknowledgements and account emails
+# from becoming digest entities.
 RELEVANCE_METADATA_KEY = "relevance"
 RELEVANCE_FILTER_VERSION = "relevance_rules_v1"
 
@@ -119,6 +122,8 @@ class RelevanceFilter:
     def annotate(self, event: CommunicationEvent) -> CommunicationEvent:
         verdict = self.assess(event)
         metadata = dict(event.metadata)
+        # Store the verdict on the event so the frontend can show ignored source
+        # evidence and the backend can skip extraction deterministically.
         metadata[RELEVANCE_METADATA_KEY] = verdict.to_metadata()
         return event.model_copy(update={"metadata": metadata})
 
@@ -129,6 +134,8 @@ class RelevanceFilter:
         metadata = event.metadata.get(RELEVANCE_METADATA_KEY)
         if isinstance(metadata, dict) and metadata.get("version") == RELEVANCE_FILTER_VERSION:
             return bool(metadata.get("is_relevant"))
+        # Older events without a verdict are assessed on demand instead of
+        # forcing a database migration.
         return self.assess(event).is_relevant
 
     def _combined_text(self, event: CommunicationEvent) -> str:

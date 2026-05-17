@@ -17,6 +17,8 @@ ROLE_KEYWORDS = {
 
 
 class Extractor:
+    """Rule-based extraction for project signals in a single communication event."""
+
     def extract(self, event: CommunicationEvent) -> list[ProjectEntity]:
         text = f"{event.title or ''} {event.text}".lower()
         if self._is_low_signal(text):
@@ -31,6 +33,8 @@ class Extractor:
             role for role, terms in ROLE_KEYWORDS.items() if any(term in text for term in terms)
         ] or ["engineering_manager"]
 
+        # IDs are stable across syncs for the same project/type/topic, which
+        # gives the merger a deterministic first pass before fuzzy matching.
         entity_id = self._stable_id(event.project, entity_type.value, keywords or [title.lower()])
         resolved_at = event.timestamp if status == EntityStatus.RESOLVED else None
 
@@ -67,6 +71,8 @@ class Extractor:
         return EntityType.ISSUE
 
     def _is_low_signal(self, text: str) -> bool:
+        # This is a second safety net after RelevanceFilter. It protects manual
+        # events and older stored records that may not have relevance metadata.
         normalized = re.sub(r"[^a-z0-9\s]", "", text).strip()
         normalized = re.sub(r"\s+", " ", normalized)
         low_signal_messages = {
@@ -115,6 +121,8 @@ class Extractor:
         return EntityStatus.ACTIVE
 
     def _confidence(self, text: str) -> float:
+        # Confidence gates hybrid mode: high-confidence rule results skip the
+        # LLM, while vague but relevant events can be escalated.
         if any(term in text for term in ["blocked", "decision:", "action item", "resolved"]):
             return 0.9
         if any(term in text for term in ["risk", "waiting on", "depends on"]):

@@ -32,6 +32,8 @@ export default function Home() {
   const currentProject = useMemo(() => projects.find((project) => project.id === projectId), [projects, projectId]);
 
   async function refresh() {
+    // Read-only refresh: reload source evidence, the role-specific digest, and
+    // backend mode/count badges without forcing a new source sync.
     const [nextEvents, nextDigest, nextSystemStatus] = await Promise.all([
       api.events(projectId),
       api.digest(projectId, userId, phase),
@@ -56,6 +58,8 @@ export default function Home() {
   }, [projectId, userId, phase]);
 
   async function sync() {
+    // Sync Sources is the expensive refresh path. It pulls configured sources,
+    // rebuilds extraction/entity state, then refreshes the UI from the backend.
     const result = await api.sync();
     setStatus(`Synced ${result.events} events (${result.ignored_events} ignored) into ${result.entities} project entities`);
     await refresh();
@@ -89,6 +93,7 @@ export default function Home() {
             <h2 className="mt-1 text-lg font-semibold">{currentProject?.name || "Warehouse Robot V2"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">{digest?.team_summary || "Loading digest..."}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+              {/* These badges make demo mode visible without opening .env. */}
               <span className="rounded border border-line px-2 py-1">Summary: {systemStatus?.summary_mode || "rules"}</span>
               <span className="rounded border border-line px-2 py-1">Extraction: {systemStatus?.extraction_mode || "rules"}</span>
               {systemStatus?.openai_model && (
@@ -99,6 +104,8 @@ export default function Home() {
               <span className="rounded border border-line px-2 py-1">Entities: {systemStatus?.entities ?? 0}</span>
             </div>
             <div className="mt-3 grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
+              {/* Last sync is source ingestion time; digest generated is when the
+                  current digest response was computed or read from cache. */}
               <p>Last sync: {formatTimestamp(systemStatus?.last_sync_at)}</p>
               <p>Digest generated: {formatTimestamp(digest?.generated_at)}{digest?.cache_hit ? " (cached)" : ""}</p>
             </div>

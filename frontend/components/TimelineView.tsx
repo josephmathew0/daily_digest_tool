@@ -30,6 +30,8 @@ function EvidenceItem({ event, muted = false }: { event: EventPayload; muted?: b
 }
 
 export function TimelineView({ events }: { events: EventPayload[] }) {
+  // Evidence is newest-first so users can verify the latest Slack/Gmail update
+  // immediately after clicking Sync Sources.
   const newestFirst = events.slice().reverse();
   const relevantEvents = newestFirst.filter((event) => event.is_relevant !== false);
   const ignoredEvents = newestFirst.filter((event) => event.is_relevant === false);
@@ -42,6 +44,8 @@ export function TimelineView({ events }: { events: EventPayload[] }) {
           <EvidenceItem key={event.id} event={event} />
         ))}
         {ignoredEvents.length > 0 && (
+          // Ignored events stay visible but collapsed for auditability; this is
+          // useful when explaining why acknowledgements or account emails were skipped.
           <details className="pt-1">
             <summary className="cursor-pointer text-sm font-medium text-slate-600">
               Ignored source events ({ignoredEvents.length})

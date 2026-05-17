@@ -47,6 +47,8 @@ class RealGmailSource(CommunicationSource):
             return []
 
         service = build("gmail", "v1", credentials=self._credentials())
+        # Received and sent mail are fetched separately so the evidence panel can
+        # show direction while the digest sees one normalized event shape.
         events = self._fetch_query(service, "in:inbox", "received")
         if self.include_sent:
             events.extend(self._fetch_query(service, "in:sent", "sent"))
@@ -56,12 +58,16 @@ class RealGmailSource(CommunicationSource):
         credentials = Credentials.from_authorized_user_file(str(self.token_path), SCOPES)
         if credentials.expired and credentials.refresh_token:
             credentials.refresh(Request())
+            # Persist refreshed OAuth tokens locally so Docker restarts do not
+            # require a new browser authorization flow.
             self.token_path.write_text(credentials.to_json())
         return credentials
 
     def _fetch_query(self, service, label_query: str, direction: str) -> list[CommunicationEvent]:
         query_parts = [label_query, f"newer_than:{self.lookback_days}d"]
         if self.require_label:
+            # Label-gated mode is the production-style path: only emails the
+            # user intentionally labels for the project are considered.
             query_parts.append(f'label:"{self.gmail_label}"')
         query = " ".join(query_parts)
         response = service.users().messages().list(userId="me", q=query, maxResults=50).execute()
@@ -95,6 +101,8 @@ class RealGmailSource(CommunicationSource):
         if not self._is_relevant_email(subject, body, sender):
             return None
 
+        # The Gmail API returns a nested MIME payload. By this point the message
+        # is reduced to the fields the rest of the app understands.
         sender_name, sender_email = self._first_address(sender)
         recipient_emails = [email for _, email in getaddresses([recipients]) if email]
 
@@ -131,6 +139,8 @@ class RealGmailSource(CommunicationSource):
         return datetime.now(timezone.utc)
 
     def _body(self, payload: dict) -> str:
+        # Prefer text/plain and recurse through multipart messages. HTML parsing
+        # is intentionally avoided for this demo to keep ingestion predictable.
         if payload.get("mimeType") == "text/plain" and payload.get("body", {}).get("data"):
             return self._decode(payload["body"]["data"])
 
@@ -154,6 +164,8 @@ class RealGmailSource(CommunicationSource):
         return name or email or None, email or None
 
     def _clean_body(self, body: str) -> str:
+        # Strip URLs and collapse whitespace so long marketing/account emails do
+        # not stretch the UI or dominate extraction prompts.
         body = re.sub(r"<https?://[^>\s]+>", "", body)
         body = re.sub(r"https?://\S+", "", body)
         body = re.sub(r"\s+", " ", body)
@@ -164,6 +176,8 @@ class RealGmailSource(CommunicationSource):
         if any(excluded in sender_lower for excluded in self.excluded_senders):
             return False
 
+        # This lightweight prefilter runs before the broader RelevanceFilter and
+        # keeps obvious non-project email out of the normalized event stream.
         searchable = f"{subject} {body}".lower()
         return any(term in searchable for term in self.project_terms)
 

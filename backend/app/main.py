@@ -25,10 +25,19 @@ from app.services.relevance_filter import RelevanceFilter
 from app.services.state_tracker import StateTracker
 
 
+# The API layer deliberately stays thin: endpoints orchestrate ingestion,
+# persistence, extraction, and digest generation while the domain rules live in
+# services.
 DATA_DIR = Path(__file__).resolve().parent / "data"
 ADDED_EVENTS_PATH = DATA_DIR / "added_events.json"
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+# Bump this when digest generation or summary behavior changes in a way that
+# should invalidate previously saved digest responses.
 DIGEST_CACHE_VERSION = "digest_v7"
+
+# This is process-local request telemetry for the demo UI. After a restart,
+# /system-status falls back to SQLite so the badge counts do not reset to zero.
 LAST_SYNC_STATUS: dict = {
     "last_sync_at": None,
     "events": 0,
@@ -110,6 +119,8 @@ def all_events() -> list[CommunicationEvent]:
     if events:
         return events
 
+    # First run bootstrap: load configured sources into SQLite so later reads
+    # use the same path as an explicit Sync Sources action.
     source_events = sorted(IngestionService().fetch_all() + load_added_events(), key=lambda event: event.timestamp)
     source_events = RelevanceFilter().annotate_many(source_events)
     upsert_events(source_events)
@@ -125,6 +136,9 @@ def event_response(event: CommunicationEvent) -> EventResponse:
     relevance = event.metadata.get("relevance")
     if not isinstance(relevance, dict):
         relevance = relevance_filter.assess(event).to_metadata()
+
+    # Flatten relevance metadata for the frontend so evidence rendering does not
+    # need to understand the backend's nested metadata structure.
     return EventResponse(
         id=event.id,
         source_type=event.source_type.value,
@@ -150,6 +164,9 @@ def event_response(event: CommunicationEvent) -> EventResponse:
 
 
 def persisted_status_counts() -> dict:
+    # Used when the app has restarted before the next sync. Extraction reuse
+    # counters are intentionally process-local, but event/entity counts can be
+    # recovered from persisted state.
     relevance_filter = RelevanceFilter()
     events = list_events()
     entities = list_project_entities()
@@ -211,6 +228,8 @@ def add_event(event: CommunicationEvent):
 
 @app.post("/sync")
 def sync_sources():
+    # Sync is the authoritative refresh: fetch every enabled source, annotate
+    # relevance, upsert events, rebuild project entities, and update status.
     events = sorted(IngestionService().fetch_all() + load_added_events(), key=lambda event: event.timestamp)
     relevance_filter = RelevanceFilter()
     events = relevance_filter.annotate_many(events)
@@ -252,6 +271,8 @@ def get_digest(user_id: str, phase: str = "prototype", project: str = "warehouse
 
     entities = list_project_entities(project)
     if not entities:
+        # If no project snapshot exists yet, build one lazily so the first page
+        # load can still produce a digest before the user clicks Sync Sources.
         entities = [
             entity for entity in all_entities()
             if any(event.id in entity.supporting_events and event.project == project for event in all_events())
@@ -262,6 +283,8 @@ def get_digest(user_id: str, phase: str = "prototype", project: str = "warehouse
         os.getenv("OPENAI_MODEL", ""),
         DIGEST_CACHE_VERSION,
     ])
+    # Digest cache keys include the entity fingerprint and summary settings, so
+    # changing project state or LLM/rules mode produces a fresh response.
     cached = get_cached_digest(project, user_id, phase, fingerprint)
     if cached:
         return cached

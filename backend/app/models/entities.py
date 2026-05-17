@@ -6,6 +6,8 @@ from app.models.enums import EntityStatus, EntityType, Severity
 
 
 class ProjectEntity(BaseModel):
+    """Durable project state extracted from one or more communication events."""
+
     id: str
     entity_type: EntityType
     title: str

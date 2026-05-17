@@ -30,6 +30,8 @@ SEVERITY_SCORE = {
 
 
 class RelevanceEngine:
+    """Score a project entity for a selected viewer role and project phase."""
+
     def score(self, entity: ProjectEntity, role: str, phase: str) -> tuple[float, list[str]]:
         reasons: list[str] = []
         text = f"{entity.title} {entity.summary} {' '.join(entity.keywords)}".lower()
@@ -66,6 +68,8 @@ class RelevanceEngine:
             score += min(event_count * 0.4, 2.0)
             reasons.append("Mentioned by multiple source events")
 
+        # Recency is a small tie-breaker, not the main signal. Severity,
+        # lifecycle, role match, and phase match should dominate ordering.
         age_hours = max((datetime.now(timezone.utc) - entity.updated_at).total_seconds() / 3600, 1)
         score += max(0.0, 2.0 - age_hours / 36)
 

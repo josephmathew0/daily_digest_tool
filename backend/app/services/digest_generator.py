@@ -19,6 +19,8 @@ SECTION_NAMES = {
 
 
 class DigestGenerator:
+    """Convert merged project entities into the role-specific digest response."""
+
     def __init__(self) -> None:
         self.relevance = RelevanceEngine()
         self.summary_provider = build_summary_provider()
@@ -26,6 +28,8 @@ class DigestGenerator:
     def generate(self, *, project: str, user: dict, phase: str, entities: list[ProjectEntity]) -> DigestResponse:
         sections: dict[str, list[DigestItem]] = defaultdict(list)
         for entity in entities:
+            # Relevance is computed at digest time because the same project state
+            # should look different to a mechanical engineer and a PM.
             score, reasons = self.relevance.score(entity, user["role"], phase)
             item = DigestItem(
                 entity=entity,
@@ -36,6 +40,8 @@ class DigestGenerator:
             sections[SECTION_NAMES[entity.entity_type]].append(item)
 
         sorted_sections = {
+            # Keep each section compact for the demo and ordered by urgency first,
+            # then by role/phase relevance score.
             name: sorted(items, key=self._sort_key)[:6]
             for name, items in sections.items()
         }
@@ -52,6 +58,8 @@ class DigestGenerator:
         )
 
     def _sort_key(self, item: DigestItem) -> tuple[int, float]:
+        # Lifecycle rank makes unresolved work appear before resolved updates,
+        # while still retaining resolved items for audit and regression checks.
         lifecycle_rank = {
             EntityStatus.BLOCKED: 0,
             EntityStatus.PENDING: 1,

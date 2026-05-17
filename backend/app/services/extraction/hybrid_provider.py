@@ -20,6 +20,8 @@ class HybridExtractionProvider(ExtractionProvider):
             return rule_entities
 
         try:
+            # Hybrid mode spends LLM tokens only when rules cannot confidently
+            # describe the event. If OpenAI fails, the rule result is still used.
             return self.openai.extract(event)
         except Exception:
             return rule_entities

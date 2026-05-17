@@ -11,6 +11,8 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 
 def build_sources() -> list[CommunicationSource]:
+    # Each source can be mock, real, or both. Meetings stay mock for now because
+    # the assessment demo focuses real integrations on Slack and Gmail.
     slack_source = os.getenv("SLACK_SOURCE", "mock").lower()
     email_source = os.getenv("EMAIL_SOURCE", "mock").lower()
     sources: list[CommunicationSource] = []

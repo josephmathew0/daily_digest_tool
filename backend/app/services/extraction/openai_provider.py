@@ -39,6 +39,8 @@ class OpenAIExtractionProvider(ExtractionProvider):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def extract(self, event: CommunicationEvent) -> list[ProjectEntity]:
+        # Responses.parse validates the model output directly into Pydantic
+        # models, which avoids ad hoc JSON parsing and keeps extraction typed.
         response = self.client.responses.parse(
             model=self.model_name,
             instructions=(
@@ -68,6 +70,8 @@ class OpenAIExtractionProvider(ExtractionProvider):
         return [self._to_project_entity(event, item) for item in parsed.entities]
 
     def _event_prompt(self, event: CommunicationEvent) -> str:
+        # Keep the prompt bounded so one very long email cannot crowd out the
+        # fields the model needs for a single-event extraction.
         return (
             f"Event ID: {event.id}\n"
             f"Source: {event.source_type.value} / {event.source_ref}\n"
@@ -81,6 +85,8 @@ class OpenAIExtractionProvider(ExtractionProvider):
     def _to_project_entity(self, event: CommunicationEvent, item: ExtractedEntity) -> ProjectEntity:
         now = event.timestamp
         resolved_at = now if item.status == EntityStatus.RESOLVED else None
+        # LLM output is converted back into the same ProjectEntity contract used
+        # by rules, so merging and digest generation do not care about provider.
         return ProjectEntity(
             id=self._stable_id(event, item),
             entity_type=item.entity_type,

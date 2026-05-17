@@ -12,6 +12,8 @@ from app.services.relevance_filter import RelevanceFilter
 
 
 class StateTracker:
+    """Build the durable project state from normalized communication events."""
+
     def __init__(self) -> None:
         self.extraction_provider = build_extraction_provider()
         self.relevance_filter = RelevanceFilter()
@@ -26,6 +28,8 @@ class StateTracker:
                 stats["skipped_irrelevant"] += 1
                 continue
 
+            # Extraction is cached per event hash. This is where repeated syncs
+            # avoid rerunning rules or spending LLM tokens on unchanged events.
             next_hash = event_hash(event)
             cached = get_cached_extraction(
                 event.id,
@@ -54,6 +58,8 @@ class StateTracker:
         self.last_stats = stats
         merged = self.merger.merge(extracted)
         for project in sorted({event.project for event in events}):
+            # Persist one materialized entity snapshot per project so /digest and
+            # /system-status can work after process restart.
             replace_project_entities(
                 project,
                 [

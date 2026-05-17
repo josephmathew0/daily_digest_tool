@@ -7,6 +7,8 @@ from app.models.enums import SourceType
 
 
 class CommunicationEvent(BaseModel):
+    """Normalized communication event shared by mock data, Slack, Gmail, and meetings."""
+
     id: str
     source_type: SourceType
     source_ref: str

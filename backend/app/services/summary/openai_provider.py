@@ -17,6 +17,9 @@ class OpenAISummaryProvider(SummaryProvider):
         if not entities:
             return "No execution signals are currently tracked for this project."
 
+        # Summaries are generated from structured entities, not raw emails or
+        # Slack text. That keeps prompts smaller and limits exposure of source
+        # content once extraction has already identified the project state.
         response = self.client.responses.create(
             model=self.model_name,
             instructions=(
@@ -40,6 +43,8 @@ class OpenAISummaryProvider(SummaryProvider):
     def _entities_prompt(self, entities: list[ProjectEntity]) -> str:
         lines = []
         for entity in entities[:20]:
+            # Bound summary context to the highest-signal entities supplied by
+            # the digest pipeline rather than every historical message.
             lines.append(
                 "- "
                 f"{entity.entity_type.value} | {entity.status.value} | {entity.severity.value} | "

@@ -10,6 +10,8 @@ class RuleBasedSummaryProvider(SummaryProvider):
     model_name = None
 
     def team_summary(self, entities: list[ProjectEntity], phase: str) -> str:
+        # The rules summary is deterministic and free to run, so it is the safe
+        # default when OpenAI credits or network access are unavailable.
         unresolved = [entity for entity in entities if entity.status != EntityStatus.RESOLVED]
         high_impact = [
             entity for entity in unresolved

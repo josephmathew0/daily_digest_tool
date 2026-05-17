@@ -10,6 +10,9 @@ from app.models.digest import DigestResponse
 from app.models.entities import ProjectEntity
 
 
+# SQLite is the project-local persistence layer for the demo. It stores raw
+# normalized source events, cached per-event extractions, the latest merged
+# project entities, and cached digest responses.
 DB_PATH = Path(__file__).resolve().parent / "app.db"
 
 
@@ -113,6 +116,8 @@ def init_db() -> None:
 
 
 def event_hash(event: CommunicationEvent) -> str:
+    # Hash the normalized event payload, not just the source ID. If Slack/Gmail
+    # metadata or text changes, extraction cache entries become invalid.
     payload = event.model_dump(mode="json")
     stable_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(stable_json.encode("utf-8")).hexdigest()
@@ -134,6 +139,8 @@ def upsert_events(events: Iterable[CommunicationEvent]) -> dict[str, int]:
             ).fetchone()
 
             if existing and existing["event_hash"] == next_hash:
+                # Unchanged events are counted but not rewritten; this keeps
+                # repeated syncs cheap and preserves updated_at signal.
                 unchanged += 1
                 continue
 
@@ -209,6 +216,9 @@ def get_cached_extraction(
     extractor_version: str,
     model_name: str | None = None,
 ) -> list[ProjectEntity] | None:
+    # Extraction cache entries are valid only for the exact event content,
+    # extraction mode, extractor version, and model. This prevents stale LLM or
+    # rule output after prompt/rule changes.
     init_db()
     with connection() as conn:
         row = conn.execute(
@@ -240,6 +250,8 @@ def save_extraction(
     now = datetime.now(timezone.utc).isoformat()
     entities_json = json.dumps([entity.model_dump(mode="json") for entity in entities])
     with connection() as conn:
+        # Keep the original cache creation time while replacing the computed
+        # entities when event content or extraction settings change.
         existing = conn.execute(
             "SELECT created_at FROM event_extractions WHERE event_id = ?",
             (event_id,),
@@ -274,6 +286,8 @@ def save_extraction(
 
 
 def replace_project_entities(project: str, entities: list[ProjectEntity]) -> None:
+    # The project entity table is a materialized snapshot rebuilt from current
+    # source events on sync. Replacing by project avoids partial stale entities.
     init_db()
     now = datetime.now(timezone.utc).isoformat()
     with connection() as conn:
@@ -326,6 +340,8 @@ def list_project_entities(project: str | None = None) -> list[ProjectEntity]:
 
 
 def entity_fingerprint(entities: list[ProjectEntity]) -> str:
+    # The digest cache only cares about fields that affect what the user sees.
+    # Ordering is normalized so equivalent entity sets produce the same key.
     payload = [
         {
             "id": entity.id,
@@ -358,6 +374,7 @@ def get_cached_digest(project: str, user_id: str, phase: str, fingerprint: str) 
     digest = DigestResponse.model_validate(json.loads(row["digest_json"]))
     if not digest.generated_at:
         digest = digest.model_copy(update={"generated_at": row["created_at"]})
+    # cache_hit is a response-time flag, not part of the durable digest content.
     return digest.model_copy(update={"cache_hit": True})
 
 
@@ -367,6 +384,8 @@ def save_digest(project: str, user_id: str, phase: str, fingerprint: str, digest
     now = datetime.now(timezone.utc).isoformat()
     digest_json = json.dumps(digest.model_copy(update={"cache_hit": False}).model_dump(mode="json"))
     with connection() as conn:
+        # Preserve created_at so the UI can show when the digest was first
+        # generated even if the cache row is refreshed.
         existing = conn.execute(
             "SELECT created_at FROM digest_cache WHERE cache_key = ?",
             (key,),

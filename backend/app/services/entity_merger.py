@@ -4,6 +4,10 @@ from app.models.entities import ProjectEntity
 from app.models.enums import EntityStatus, EntityType, Severity
 
 
+# Entity merging turns message-level extractions into durable project state.
+# Most of the complexity here is defensive: related updates should merge, but
+# nearby topics such as bracket procurement and connector CAD should not collapse
+# into one generic blocker.
 SEVERITY_RANK = {
     Severity.LOW: 1,
     Severity.MEDIUM: 2,
@@ -119,6 +123,8 @@ class EntityMerger:
         next_status = self._lifecycle_status(existing, entity)
 
         if entity.updated_at >= existing.updated_at:
+            # Newer evidence becomes the displayed summary, while accumulated
+            # supporting events and keywords are preserved below.
             existing.summary = entity.summary
             existing.updated_at = entity.updated_at
             existing.status = next_status
@@ -145,6 +151,8 @@ class EntityMerger:
                 continue
             if not self._domain_compatible(candidate, entity):
                 continue
+            # Resolution messages are often phrased differently from the
+            # original issue, so domain overlap is allowed to bridge them.
             if self._is_resolution_update(entity) and self._domain_overlap(candidate, entity) >= 2:
                 return candidate
             if self._keyword_overlap(candidate, entity) >= KEYWORD_OVERLAP_THRESHOLD:
@@ -183,6 +191,8 @@ class EntityMerger:
         if any(signal in text for signal in REGRESSION_SIGNALS):
             return EntityStatus.ACTIVE
         if any(signal in text for signal in ACTIVE_SIGNALS):
+            # "Still blocked" should not accidentally resolve an existing item
+            # even if the extractor labeled the new message as resolved.
             return entity.status if entity.status != EntityStatus.RESOLVED else existing.status
         if entity.status == EntityStatus.RESOLVED or any(signal in text for signal in RESOLVED_SIGNALS):
             return EntityStatus.RESOLVED
@@ -206,6 +216,8 @@ class EntityMerger:
         second_group = self._dominant_domain_group(second_terms)
         if first_group and second_group and first_group != second_group:
             return False
+        # Require at least one concrete engineering/procurement term in common
+        # to avoid merging items just because both mention "risk" or "blocked".
         return bool(first_terms & second_terms)
 
     def _domain_terms(self, entity: ProjectEntity) -> set[str]:

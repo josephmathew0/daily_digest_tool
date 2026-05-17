@@ -18,6 +18,8 @@ function formatTimestamp(value?: string) {
 }
 
 function lifecycleTimestamps(item: DigestItem) {
+  // Show lifecycle timestamps in the order users care about most: due/resolved
+  // first when present, then latest update and original creation time.
   const timestamps = [
     `Updated: ${formatTimestamp(item.entity.updated_at)}`,
     `Created: ${formatTimestamp(item.entity.created_at)}`
@@ -55,6 +57,7 @@ export function DigestSection({ title, items }: { title: string; items: DigestIt
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-700">{item.latest_update}</p>
             <div className="mt-3 flex flex-wrap gap-2">
+              {/* Reasons are backend scoring explanations, not user-entered tags. */}
               {item.why_this_matters.map((reason) => (
                 <span key={reason} className="rounded bg-panel px-2 py-1 text-xs text-slate-700">{reason}</span>
               ))}

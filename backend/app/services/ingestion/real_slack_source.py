@@ -29,6 +29,9 @@ class RealSlackSource(CommunicationSource):
         cursor: str | None = None
 
         try:
+            # Slack history is paginated. We fetch the current channel history
+            # into normalized CommunicationEvent objects and let the repository
+            # deduplicate by stable Slack timestamp IDs.
             while True:
                 response = self.client.conversations_history(
                     channel=self.channel_id,
@@ -59,6 +62,8 @@ class RealSlackSource(CommunicationSource):
         if not text or not ts or subtype in {"channel_join", "bot_message"}:
             return None
 
+        # Slack timestamps are stable per message, so they make good source IDs
+        # and preserve message order when converted to datetimes.
         user = self._user(user_id) if user_id else {}
         timestamp = datetime.fromtimestamp(float(ts), tz=timezone.utc)
 
@@ -91,6 +96,8 @@ class RealSlackSource(CommunicationSource):
             return self._user_cache[user_id]
 
         try:
+            # Cache user profiles because a channel history can contain many
+            # messages from the same person.
             response = self.client.users_info(user=user_id)
             profile = response.get("user", {}).get("profile", {})
             user = {
