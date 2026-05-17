@@ -64,5 +64,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Create CI backend env file
+        run: cp backend/.env.example backend/.env
+
       - name: Validate compose config
         run: docker compose config
