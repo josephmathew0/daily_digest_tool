@@ -1,17 +1,18 @@
 from app.models.communication_event import CommunicationEvent
 from app.models.entities import ProjectEntity
-from app.database.repository import event_hash, get_cached_extraction, save_extraction
+from app.database.repository import (
+    event_hash,
+    get_cached_extraction,
+    replace_project_entities,
+    save_extraction,
+)
 from app.services.entity_merger import EntityMerger
-from app.services.extractor import Extractor
-
-
-EXTRACTION_MODE = "rules"
-EXTRACTOR_VERSION = "rules_v1"
+from app.services.extraction.factory import build_extraction_provider
 
 
 class StateTracker:
     def __init__(self) -> None:
-        self.extractor = Extractor()
+        self.extraction_provider = build_extraction_provider()
         self.merger = EntityMerger()
         self.last_stats = {"extracted": 0, "reused": 0}
 
@@ -23,24 +24,38 @@ class StateTracker:
             cached = get_cached_extraction(
                 event.id,
                 next_hash,
-                EXTRACTION_MODE,
-                EXTRACTOR_VERSION,
+                self.extraction_provider.mode,
+                self.extraction_provider.version,
+                self.extraction_provider.model_name,
             )
             if cached is not None:
                 extracted.extend(cached)
                 stats["reused"] += 1
                 continue
 
-            entities = self.extractor.extract(event)
+            entities = self.extraction_provider.extract(event)
             save_extraction(
                 event.id,
                 next_hash,
                 entities,
-                EXTRACTION_MODE,
-                EXTRACTOR_VERSION,
+                self.extraction_provider.mode,
+                self.extraction_provider.version,
+                self.extraction_provider.model_name,
             )
             extracted.extend(entities)
             stats["extracted"] += 1
 
         self.last_stats = stats
-        return self.merger.merge(extracted)
+        merged = self.merger.merge(extracted)
+        for project in sorted({event.project for event in events}):
+            replace_project_entities(
+                project,
+                [
+                    entity for entity in merged
+                    if any(
+                        event.id in entity.supporting_events and event.project == project
+                        for event in events
+                    )
+                ],
+            )
+        return merged

@@ -8,3 +8,5 @@ certifi==2026.4.22
 google-api-python-client==2.187.0
 google-auth-oauthlib==1.2.3
 google-auth-httplib2==0.2.1
+openai==2.9.0
+pytest==9.0.2

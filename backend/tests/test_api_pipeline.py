@@ -1,0 +1,43 @@
+from datetime import datetime, timezone
+
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.models.communication_event import CommunicationEvent
+from app.models.enums import SourceType
+
+
+def test_sync_persists_and_reuses_extractions(monkeypatch):
+    source_event = CommunicationEvent(
+        id="slack_test_1",
+        source_type=SourceType.SLACK,
+        source_ref="#warehouse-robot-v2",
+        author_name="Alex",
+        text="PCB thermal rise is 12C over target and EVT reliability remains at risk.",
+        timestamp=datetime(2026, 5, 16, tzinfo=timezone.utc),
+        project="warehouse_robot_v2",
+    )
+
+    monkeypatch.setattr(
+        "app.main.IngestionService.fetch_all",
+        lambda self: [source_event],
+    )
+    monkeypatch.setattr("app.main.load_added_events", lambda: [])
+
+    client = TestClient(app)
+
+    first = client.post("/sync").json()
+    assert first["events"] == 1
+    assert first["inserted"] == 1
+    assert first["extracted"] == 1
+    assert first["reused_extractions"] == 0
+
+    second = client.post("/sync").json()
+    assert second["events"] == 1
+    assert second["unchanged"] == 1
+    assert second["extracted"] == 0
+    assert second["reused_extractions"] == 1
+
+    digest = client.get("/digest?user_id=alex&phase=EVT&project=warehouse_robot_v2")
+    assert digest.status_code == 200
+    assert digest.json()["user_id"] == "alex"
