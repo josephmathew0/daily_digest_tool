@@ -1,5 +1,3 @@
-from openai import OpenAIError
-
 from app.models.communication_event import CommunicationEvent
 from app.models.entities import ProjectEntity
 from app.services.extraction.base import ExtractionProvider
@@ -18,10 +16,13 @@ class HybridExtractionProvider(ExtractionProvider):
 
     def extract(self, event: CommunicationEvent) -> list[ProjectEntity]:
         rule_entities = self.rules.extract(event)
-        if not rule_entities:
-            return []
+        if self._rules_are_confident(rule_entities):
+            return rule_entities
 
         try:
             return self.openai.extract(event)
-        except OpenAIError:
+        except Exception:
             return rule_entities
+
+    def _rules_are_confident(self, entities: list[ProjectEntity]) -> bool:
+        return bool(entities) and all(entity.confidence_score >= 0.75 for entity in entities)

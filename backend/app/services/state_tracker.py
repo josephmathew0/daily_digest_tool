@@ -8,18 +8,24 @@ from app.database.repository import (
 )
 from app.services.entity_merger import EntityMerger
 from app.services.extraction.factory import build_extraction_provider
+from app.services.relevance_filter import RelevanceFilter
 
 
 class StateTracker:
     def __init__(self) -> None:
         self.extraction_provider = build_extraction_provider()
+        self.relevance_filter = RelevanceFilter()
         self.merger = EntityMerger()
-        self.last_stats = {"extracted": 0, "reused": 0}
+        self.last_stats = {"extracted": 0, "reused": 0, "skipped_irrelevant": 0}
 
     def build_entities(self, events: list[CommunicationEvent]) -> list[ProjectEntity]:
         extracted: list[ProjectEntity] = []
-        stats = {"extracted": 0, "reused": 0}
+        stats = {"extracted": 0, "reused": 0, "skipped_irrelevant": 0}
         for event in events:
+            if not self.relevance_filter.is_relevant(event):
+                stats["skipped_irrelevant"] += 1
+                continue
+
             next_hash = event_hash(event)
             cached = get_cached_extraction(
                 event.id,
