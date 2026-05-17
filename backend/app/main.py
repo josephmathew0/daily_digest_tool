@@ -1,6 +1,7 @@
 import json
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -27,7 +28,17 @@ from app.services.state_tracker import StateTracker
 DATA_DIR = Path(__file__).resolve().parent / "data"
 ADDED_EVENTS_PATH = DATA_DIR / "added_events.json"
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-DIGEST_CACHE_VERSION = "digest_v3"
+DIGEST_CACHE_VERSION = "digest_v5"
+LAST_SYNC_STATUS: dict = {
+    "last_sync_at": None,
+    "events": 0,
+    "relevant_events": 0,
+    "ignored_events": 0,
+    "entities": 0,
+    "extracted": 0,
+    "reused_extractions": 0,
+    "skipped_irrelevant": 0,
+}
 
 
 class EventResponse(BaseModel):
@@ -51,6 +62,21 @@ class EventResponse(BaseModel):
     relevance_score: float
     relevance_reason: str
     relevance_category: str
+
+
+class SystemStatusResponse(BaseModel):
+    summary_mode: str
+    extraction_mode: str
+    openai_model: str | None
+    openai_configured: bool
+    last_sync_at: str | None
+    events: int
+    relevant_events: int
+    ignored_events: int
+    entities: int
+    extracted: int
+    reused_extractions: int
+    skipped_irrelevant: int
 
 
 @asynccontextmanager
@@ -145,6 +171,17 @@ def get_events(project: str | None = None):
     return [event_response(event) for event in list_events(project)]
 
 
+@app.get("/system-status")
+def get_system_status():
+    return SystemStatusResponse(
+        summary_mode=os.getenv("SUMMARY_MODE", "rules"),
+        extraction_mode=os.getenv("EXTRACTION_MODE", "rules"),
+        openai_model=os.getenv("OPENAI_MODEL"),
+        openai_configured=bool(os.getenv("OPENAI_API_KEY")),
+        **LAST_SYNC_STATUS,
+    )
+
+
 @app.post("/events")
 def add_event(event: CommunicationEvent):
     event = RelevanceFilter().annotate(event)
@@ -164,7 +201,7 @@ def sync_sources():
     events = list_events()
     tracker = StateTracker()
     entities = tracker.build_entities(events)
-    return {
+    response = {
         "events": len(events),
         "relevant_events": sum(1 for event in events if relevance_filter.is_relevant(event)),
         "ignored_events": sum(1 for event in events if not relevance_filter.is_relevant(event)),
@@ -174,6 +211,19 @@ def sync_sources():
         "reused_extractions": tracker.last_stats["reused"],
         "skipped_irrelevant": tracker.last_stats["skipped_irrelevant"],
     }
+    LAST_SYNC_STATUS.update(
+        {
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            "events": response["events"],
+            "relevant_events": response["relevant_events"],
+            "ignored_events": response["ignored_events"],
+            "entities": response["entities"],
+            "extracted": response["extracted"],
+            "reused_extractions": response["reused_extractions"],
+            "skipped_irrelevant": response["skipped_irrelevant"],
+        }
+    )
+    return response
 
 
 @app.get("/digest")

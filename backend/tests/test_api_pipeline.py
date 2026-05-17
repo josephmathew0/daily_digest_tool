@@ -40,7 +40,21 @@ def test_sync_persists_and_reuses_extractions(monkeypatch):
 
     digest = client.get("/digest?user_id=alex&phase=EVT&project=warehouse_robot_v2")
     assert digest.status_code == 200
-    assert digest.json()["user_id"] == "alex"
+    first_digest = digest.json()
+    assert first_digest["user_id"] == "alex"
+    assert first_digest["generated_at"]
+    assert first_digest["cache_hit"] is False
+
+    cached_digest = client.get("/digest?user_id=alex&phase=EVT&project=warehouse_robot_v2").json()
+    assert cached_digest["generated_at"] == first_digest["generated_at"]
+    assert cached_digest["cache_hit"] is True
+
+    system_status = client.get("/system-status").json()
+    assert system_status["summary_mode"]
+    assert system_status["extraction_mode"]
+    assert system_status["last_sync_at"]
+    assert system_status["events"] == 1
+    assert system_status["ignored_events"] == 0
 
 
 def test_events_response_exposes_relevance_metadata(monkeypatch):

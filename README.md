@@ -18,6 +18,7 @@ The core idea is entity-centric memory. Slack and email are evidence sources; th
 - Relevance filtering for low-value messages and account/marketing emails
 - UI visibility for ignored source events and relevance reasons
 - Rule-based extraction by default
+- Rule-based entity lifecycle tracking for resolved, still-blocked, and updated items
 - Optional OpenAI summaries through `SUMMARY_MODE=openai`
 - OpenAI fallback behavior so API failures do not break the app
 - Hybrid extraction infrastructure for future LLM-assisted extraction
@@ -250,13 +251,14 @@ The prototype is designed to demonstrate:
 - Caching to avoid repeated extraction and summary work
 - Human-readable relevance explanations
 - Optional OpenAI usage with fallback
+- State changes that update existing project entities instead of only appending messages
 - Role-aware digest generation
 - CI-backed tests and build checks
 
 ## Remaining Work
 
 - Turn on and polish hybrid LLM extraction for uncertain relevant events
-- Improve entity lifecycle tracking for resolved and updated items
+- Extend lifecycle tracking with LLM support for ambiguous state changes
 - Add visible system status in the UI, including mode, last sync time, and fallback state
 - Add stronger production auth and tenant isolation
 - Add queue-based ingestion for larger-scale traffic

@@ -103,7 +103,7 @@ class Extractor:
         return Severity.LOW
 
     def _status(self, text: str) -> EntityStatus:
-        if any(term in text for term in ["resolved", "closed", "fixed", "approved"]):
+        if any(term in text for term in ["resolved", "closed", "fixed", "approved", "unblocked", "validated", "can resume"]):
             return EntityStatus.RESOLVED
         if any(term in text for term in ["blocked", "blocking", "waiting on", "blocked by"]):
             return EntityStatus.BLOCKED

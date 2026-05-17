@@ -7,6 +7,30 @@ const severityClass: Record<string, string> = {
   low: "border-slate-400 text-slate-600"
 };
 
+function formatTimestamp(value?: string) {
+  if (!value) return null;
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function lifecycleTimestamps(item: DigestItem) {
+  const timestamps = [
+    `Updated: ${formatTimestamp(item.entity.updated_at)}`,
+    `Created: ${formatTimestamp(item.entity.created_at)}`
+  ];
+  if (item.entity.resolved_at) {
+    timestamps.unshift(`Resolved: ${formatTimestamp(item.entity.resolved_at)}`);
+  }
+  if (item.entity.due_date) {
+    timestamps.unshift(`Due: ${formatTimestamp(item.entity.due_date)}`);
+  }
+  return timestamps.filter((value) => !value.endsWith("null"));
+}
+
 export function DigestSection({ title, items }: { title: string; items: DigestItem[] }) {
   if (!items.length) return null;
 
@@ -23,6 +47,11 @@ export function DigestSection({ title, items }: { title: string; items: DigestIt
                 <span className="rounded border border-line px-2 py-1 text-slate-600">{item.entity.status}</span>
                 <span className="rounded border border-line px-2 py-1 text-slate-600">score {item.score}</span>
               </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+              {lifecycleTimestamps(item).map((timestamp) => (
+                <span key={timestamp}>{timestamp}</span>
+              ))}
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-700">{item.latest_update}</p>
             <div className="mt-3 flex flex-wrap gap-2">
