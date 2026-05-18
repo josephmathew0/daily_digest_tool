@@ -24,7 +24,6 @@ The core idea is entity-centric memory. Slack and email are evidence sources; th
 - Optional OpenAI summaries through `SUMMARY_MODE=openai`
 - Optional hybrid OpenAI extraction for relevant, uncertain events
 - OpenAI fallback behavior so API failures do not break the app
-- Hybrid extraction infrastructure for future LLM-assisted extraction
 - GitHub Actions CI for backend tests, frontend build, and Compose validation
 
 ## Architecture
@@ -42,6 +41,13 @@ Slack / Gmail / Mock JSON / Manual Event
   -> Role-aware Digest API
   -> Next.js Dashboard
 ```
+
+The application stores two related layers of state:
+
+- Raw normalized events: Slack, Gmail, meeting, mock, and manual messages preserved as source evidence.
+- Extracted project entities: durable risks, blockers, decisions, dependencies, action items, and milestones derived from those events.
+
+This separation lets the app keep an audit trail while generating a clean digest from project state instead of re-reading every raw message on every page load.
 
 ## Tech Stack
 
@@ -202,6 +208,24 @@ OPENAI_API_KEY=your_api_key_here
 
 Hybrid extraction runs rules first and only uses OpenAI when the rule result is missing or low-confidence. Extraction results are cached by event hash, mode, version, and model.
 
+## Ordering and Caching
+
+Digest items are sorted inside each section by lifecycle first:
+
+1. `blocked`
+2. `pending`
+3. `active`
+4. `resolved`
+
+Within each lifecycle group, higher role/phase relevance scores appear first. Resolved items remain visible because they explain recent state changes and help reviewers verify that updates were merged into existing project entities.
+
+Caching happens at two levels:
+
+- Extraction cache: keyed by event content hash, extraction mode, extractor version, and model.
+- Digest cache: keyed by project entity fingerprint, user, phase, summary mode, model, and digest cache version.
+
+This keeps repeated syncs and page refreshes cheap while still invalidating stale results when source content or configuration changes.
+
 ## Common Commands
 
 Backend tests:
@@ -274,9 +298,8 @@ The prototype is designed to demonstrate:
 
 ## Remaining Work
 
-- Turn on and polish hybrid LLM extraction for uncertain relevant events
-- Extend lifecycle tracking with LLM support for ambiguous state changes
-- Add visible system status in the UI, including mode, last sync time, and fallback state
 - Add stronger production auth and tenant isolation
 - Add queue-based ingestion for larger-scale traffic
 - Move from SQLite to PostgreSQL for production persistence
+- Add background workers for scheduled source polling and larger batch processing
+- Add admin controls for source permissions, retention policies, and per-project access scope

@@ -21,6 +21,14 @@ docker compose up --build
 
 Open http://localhost:3000.
 
+The UI badges should show:
+
+- `Summary: rules`
+- `Extraction: rules`
+- `Model: gpt-5-mini`
+
+If you switch to OpenAI summary or hybrid extraction later, these badges are the easiest way to verify the running backend picked up the `.env` changes.
+
 ## Baseline Walkthrough
 
 1. Select `Warehouse Robot V2`.
@@ -34,6 +42,8 @@ Open http://localhost:3000.
    - Status strip: summary mode, extraction mode, model, persisted event/entity counts, last sync time, and digest generated time
    - Source Evidence
    - Ignored source events and reasons
+
+Explain that **Last sync** is the time sources were fetched and project state was rebuilt. **Digest generated** is the time the current digest response was computed; it may show `(cached)` when the same user/project/phase/config combination is reused.
 
 ## Slack Test Message
 
@@ -177,8 +187,9 @@ The latest thermal chamber run looks acceptable after firmware current limiting.
 Expected behavior after **Sync Sources**:
 
 - The app should use rules first.
-- Because the wording is more ambiguous than a direct `resolved` message, hybrid mode may use OpenAI extraction.
+- Because the wording is more ambiguous than a direct `resolved` message, hybrid mode can use OpenAI extraction if the rule result is low-confidence.
 - The thermal/PCB reliability item should move toward `resolved` or appear as a resolved thermal risk update.
+- The UI badge should show `Extraction: hybrid`.
 - The extraction cache should prevent repeated OpenAI calls for the same unchanged message.
 
 Switch back after the demo:
@@ -191,7 +202,8 @@ EXTRACTION_MODE=rules
 
 - The app normalizes Slack, Gmail, mock data, and manual entries into the same event shape.
 - Relevance filtering happens before extraction to reduce noise and future LLM cost.
-- Extraction and digest results are cached using hashes and fingerprints.
+- Raw normalized events are retained as evidence, while extracted entities are the durable project state used for the digest.
+- Extraction and digest results are cached using event hashes and entity fingerprints.
 - OpenAI is optional and has rule-based fallback behavior.
 - Hybrid extraction calls OpenAI only for relevant, uncertain events and caches the result.
 - Digest sections are lifecycle-aware: unresolved operational work appears before recently resolved items.

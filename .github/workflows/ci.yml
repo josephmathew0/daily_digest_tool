@@ -64,6 +64,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The real backend/.env is ignored because it can contain API keys and
+      # OAuth tokens. CI uses the committed example file so Compose validation
+      # has the same required variables without exposing local secrets.
       - name: Create CI backend env file
         run: cp backend/.env.example backend/.env
 
