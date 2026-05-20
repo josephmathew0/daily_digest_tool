@@ -59,6 +59,27 @@ def test_sync_persists_and_reuses_extractions(monkeypatch):
     assert readiness_payload["status"] in {"ready", "at_risk", "blocked"}
     assert readiness_payload["generated_at"]
 
+    risk_review = client.get("/risk-review?phase=EVT&project=warehouse_robot_v2")
+    assert risk_review.status_code == 200
+    risk_review_payload = risk_review.json()
+    assert risk_review_payload["project"] == "warehouse_robot_v2"
+    assert risk_review_payload["phase"] == "EVT"
+    assert "openai_configured" in risk_review_payload
+    assert len(risk_review_payload["checks"]) >= 1
+
+    disabled_question = client.post(
+        "/risk-review/question",
+        json={
+            "project": "warehouse_robot_v2",
+            "phase": "EVT",
+            "question": "What should we check before release?",
+        },
+    )
+    assert disabled_question.status_code == 200
+    disabled_payload = disabled_question.json()
+    assert disabled_payload["enabled"] is False
+    assert disabled_payload["disabled_reason"]
+
     system_status = client.get("/system-status").json()
     assert system_status["summary_mode"]
     assert system_status["extraction_mode"]

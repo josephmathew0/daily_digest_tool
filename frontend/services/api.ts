@@ -87,6 +87,29 @@ export type BuildReadiness = {
   generated_at: string;
 };
 
+export type RiskCheck = {
+  id: string;
+  title: string;
+  why_it_matters: string;
+  suggested_question: string;
+  related_entity_ids: string[];
+};
+
+export type RiskReview = {
+  project: string;
+  phase: string;
+  openai_configured: boolean;
+  ai_followup_enabled: boolean;
+  disabled_reason?: string;
+  checks: RiskCheck[];
+};
+
+export type RiskQuestionResponse = {
+  enabled: boolean;
+  answer?: string;
+  disabled_reason?: string;
+};
+
 export type SystemStatus = {
   summary_mode: string;
   extraction_mode: string;
@@ -126,6 +149,13 @@ export const api = {
   systemStatus: () => request<SystemStatus>("/system-status"),
   readiness: (project: string, phase: string) =>
     request<BuildReadiness>(`/readiness?project=${project}&phase=${phase}`),
+  riskReview: (project: string, phase: string) =>
+    request<RiskReview>(`/risk-review?project=${project}&phase=${phase}`),
+  riskReviewQuestion: (project: string, phase: string, question: string) =>
+    request<RiskQuestionResponse>("/risk-review/question", {
+      method: "POST",
+      body: JSON.stringify({ project, phase, question })
+    }),
   digest: (project: string, userId: string, phase: string) =>
     request<Digest>(`/digest?project=${project}&user_id=${userId}&phase=${phase}`),
   addEvent: (event: EventPayload) =>

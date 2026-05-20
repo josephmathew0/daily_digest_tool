@@ -20,10 +20,12 @@ from app.database.repository import (
 )
 from app.models.communication_event import CommunicationEvent
 from app.models.readiness import BuildReadinessResponse
+from app.models.risk_review import RiskQuestionRequest, RiskQuestionResponse, RiskReviewResponse
 from app.services.digest_generator import DigestGenerator
 from app.services.ingestion_service import IngestionService
 from app.services.readiness_service import ReadinessService
 from app.services.relevance_filter import RelevanceFilter
+from app.services.risk_review_service import RiskReviewService
 from app.services.state_tracker import StateTracker
 
 
@@ -285,6 +287,35 @@ def get_readiness(phase: str = "prototype", project: str = "warehouse_robot_v2")
         phase=phase,
         entities=project_entities(project),
     )
+
+
+@app.get("/risk-review", response_model=RiskReviewResponse)
+def get_risk_review(phase: str = "prototype", project: str = "warehouse_robot_v2"):
+    return RiskReviewService().review(
+        project=project,
+        phase=phase,
+        entities=project_entities(project),
+    )
+
+
+@app.post("/risk-review/question", response_model=RiskQuestionResponse)
+def ask_risk_review_question(payload: RiskQuestionRequest):
+    service = RiskReviewService()
+    review = service.review(
+        project=payload.project,
+        phase=payload.phase,
+        entities=project_entities(payload.project),
+    )
+    if not review.ai_followup_enabled:
+        return RiskQuestionResponse(enabled=False, disabled_reason=review.disabled_reason)
+
+    answer = service.answer_question(
+        project=payload.project,
+        phase=payload.phase,
+        entities=project_entities(payload.project),
+        question=payload.question,
+    )
+    return RiskQuestionResponse(enabled=True, answer=answer)
 
 
 @app.get("/digest")
