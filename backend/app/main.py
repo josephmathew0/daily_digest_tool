@@ -19,8 +19,10 @@ from app.database.repository import (
     upsert_events,
 )
 from app.models.communication_event import CommunicationEvent
+from app.models.readiness import BuildReadinessResponse
 from app.services.digest_generator import DigestGenerator
 from app.services.ingestion_service import IngestionService
+from app.services.readiness_service import ReadinessService
 from app.services.relevance_filter import RelevanceFilter
 from app.services.state_tracker import StateTracker
 
@@ -182,6 +184,20 @@ def persisted_status_counts() -> dict:
     }
 
 
+def project_entities(project: str):
+    entities = list_project_entities(project)
+    if entities:
+        return entities
+
+    # If no project snapshot exists yet, build one lazily so first page load can
+    # still produce downstream views before the user clicks Sync Sources.
+    events = all_events()
+    return [
+        entity for entity in all_entities()
+        if any(event.id in entity.supporting_events and event.project == project for event in events)
+    ]
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -262,6 +278,15 @@ def sync_sources():
     return response
 
 
+@app.get("/readiness", response_model=BuildReadinessResponse)
+def get_readiness(phase: str = "prototype", project: str = "warehouse_robot_v2"):
+    return ReadinessService().assess(
+        project=project,
+        phase=phase,
+        entities=project_entities(project),
+    )
+
+
 @app.get("/digest")
 def get_digest(user_id: str, phase: str = "prototype", project: str = "warehouse_robot_v2"):
     users = {user["id"]: user for user in load_json("users.json")}
@@ -269,14 +294,7 @@ def get_digest(user_id: str, phase: str = "prototype", project: str = "warehouse
     if not user:
         raise HTTPException(status_code=404, detail="Unknown user")
 
-    entities = list_project_entities(project)
-    if not entities:
-        # If no project snapshot exists yet, build one lazily so the first page
-        # load can still produce a digest before the user clicks Sync Sources.
-        entities = [
-            entity for entity in all_entities()
-            if any(event.id in entity.supporting_events and event.project == project for event in all_events())
-        ]
+    entities = project_entities(project)
     fingerprint = ":".join([
         entity_fingerprint(entities),
         os.getenv("SUMMARY_MODE", "rules"),

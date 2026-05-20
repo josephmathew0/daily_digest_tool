@@ -51,6 +51,14 @@ def test_sync_persists_and_reuses_extractions(monkeypatch):
     assert cached_digest["generated_at"] == first_digest["generated_at"]
     assert cached_digest["cache_hit"] is True
 
+    readiness = client.get("/readiness?phase=EVT&project=warehouse_robot_v2")
+    assert readiness.status_code == 200
+    readiness_payload = readiness.json()
+    assert readiness_payload["project"] == "warehouse_robot_v2"
+    assert readiness_payload["phase"] == "EVT"
+    assert readiness_payload["status"] in {"ready", "at_risk", "blocked"}
+    assert readiness_payload["generated_at"]
+
     system_status = client.get("/system-status").json()
     assert system_status["summary_mode"]
     assert system_status["extraction_mode"]

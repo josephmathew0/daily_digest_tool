@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AddCommunicationEventForm } from "@/components/AddCommunicationEventForm";
+import { BuildReadinessPanel } from "@/components/BuildReadinessPanel";
 import { Controls } from "@/components/Controls";
 import { DigestSection } from "@/components/DigestSection";
 import { Header } from "@/components/Header";
 import { TimelineView } from "@/components/TimelineView";
-import { api, Digest, EventPayload, Project, SystemStatus, User } from "@/services/api";
+import { api, BuildReadiness, Digest, EventPayload, Project, SystemStatus, User } from "@/services/api";
 
 function formatTimestamp(value?: string) {
   if (!value) return "Not yet";
@@ -23,6 +24,7 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [events, setEvents] = useState<EventPayload[]>([]);
   const [digest, setDigest] = useState<Digest | null>(null);
+  const [readiness, setReadiness] = useState<BuildReadiness | null>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [projectId, setProjectId] = useState("warehouse_robot_v2");
   const [userId, setUserId] = useState("maya");
@@ -34,13 +36,15 @@ export default function Home() {
   async function refresh() {
     // Read-only refresh: reload source evidence, the role-specific digest, and
     // backend mode/count badges without forcing a new source sync.
-    const [nextEvents, nextDigest, nextSystemStatus] = await Promise.all([
+    const [nextEvents, nextDigest, nextReadiness, nextSystemStatus] = await Promise.all([
       api.events(projectId),
       api.digest(projectId, userId, phase),
+      api.readiness(projectId, phase),
       api.systemStatus()
     ]);
     setEvents(nextEvents);
     setDigest(nextDigest);
+    setReadiness(nextReadiness);
     setSystemStatus(nextSystemStatus);
   }
 
@@ -111,6 +115,8 @@ export default function Home() {
             </div>
             <p className="mt-3 text-sm text-slate-500">{status}</p>
           </section>
+
+          <BuildReadinessPanel readiness={readiness} />
 
           {digest && Object.entries(digest.sections).map(([section, items]) => (
             <DigestSection key={section} title={section} items={items} />

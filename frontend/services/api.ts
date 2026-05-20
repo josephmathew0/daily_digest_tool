@@ -65,6 +65,28 @@ export type Digest = {
   sections: Record<string, DigestItem[]>;
 };
 
+export type ReadinessItem = {
+  entity_id: string;
+  title: string;
+  summary: string;
+  status: string;
+  severity: string;
+  updated_at: string;
+  supporting_events: string[];
+};
+
+export type BuildReadiness = {
+  project: string;
+  phase: string;
+  status: "ready" | "at_risk" | "blocked";
+  summary: string;
+  blockers: ReadinessItem[];
+  risks: ReadinessItem[];
+  resolved: ReadinessItem[];
+  missing_confirmations: ReadinessItem[];
+  generated_at: string;
+};
+
 export type SystemStatus = {
   summary_mode: string;
   extraction_mode: string;
@@ -102,6 +124,8 @@ export const api = {
   events: (project: string) => request<EventPayload[]>(`/events?project=${project}`),
   sync: () => request<{ events: number; relevant_events: number; ignored_events: number; entities: number }>("/sync", { method: "POST" }),
   systemStatus: () => request<SystemStatus>("/system-status"),
+  readiness: (project: string, phase: string) =>
+    request<BuildReadiness>(`/readiness?project=${project}&phase=${phase}`),
   digest: (project: string, userId: string, phase: string) =>
     request<Digest>(`/digest?project=${project}&user_id=${userId}&phase=${phase}`),
   addEvent: (event: EventPayload) =>

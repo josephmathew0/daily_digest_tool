@@ -37,3 +37,9 @@ class ProjectPhase(str, Enum):
     DVT = "DVT"
     PVT = "PVT"
     PRODUCTION = "production"
+
+
+class ReadinessStatus(str, Enum):
+    READY = "ready"
+    AT_RISK = "at_risk"
+    BLOCKED = "blocked"
