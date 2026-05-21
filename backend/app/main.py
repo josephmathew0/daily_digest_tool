@@ -19,10 +19,18 @@ from app.database.repository import (
     upsert_events,
 )
 from app.models.communication_event import CommunicationEvent
+from app.models.procurement import (
+    ProcurementDraftRequest,
+    ProcurementDraftResponse,
+    ProcurementForecastResponse,
+    ProcurementSendRequest,
+    ProcurementSendResponse,
+)
 from app.models.readiness import BuildReadinessResponse
 from app.models.risk_review import RiskQuestionRequest, RiskQuestionResponse, RiskReviewResponse
 from app.services.digest_generator import DigestGenerator
 from app.services.ingestion_service import IngestionService
+from app.services.procurement_service import ProcurementService
 from app.services.readiness_service import ReadinessService
 from app.services.relevance_filter import RelevanceFilter
 from app.services.risk_review_service import RiskReviewService
@@ -316,6 +324,35 @@ def ask_risk_review_question(payload: RiskQuestionRequest):
         question=payload.question,
     )
     return RiskQuestionResponse(enabled=True, answer=answer)
+
+
+@app.get("/procurement/forecast", response_model=ProcurementForecastResponse)
+def get_procurement_forecast(phase: str = "prototype", project: str = "warehouse_robot_v2"):
+    return ProcurementService().forecast(
+        project=project,
+        phase=phase,
+        entities=project_entities(project),
+    )
+
+
+@app.post("/procurement/draft-email", response_model=ProcurementDraftResponse)
+def draft_procurement_email(payload: ProcurementDraftRequest):
+    return ProcurementService().draft_email(
+        project=payload.project,
+        phase=payload.phase,
+        item_id=payload.item_id,
+        recipient_email=payload.recipient_email,
+        entities=project_entities(payload.project),
+    )
+
+
+@app.post("/procurement/send-email", response_model=ProcurementSendResponse)
+def send_procurement_email(payload: ProcurementSendRequest):
+    return ProcurementService().send_email(
+        recipient_email=payload.recipient_email,
+        subject=payload.subject,
+        body=payload.body,
+    )
 
 
 @app.get("/digest")

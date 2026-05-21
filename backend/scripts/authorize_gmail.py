@@ -5,7 +5,10 @@ from dotenv import load_dotenv
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+]
 BASE_DIR = Path(__file__).resolve().parents[1]
 
 

@@ -110,6 +110,36 @@ export type RiskQuestionResponse = {
   disabled_reason?: string;
 };
 
+export type ProcurementItem = {
+  id: string;
+  title: string;
+  reason: string;
+  suggested_action: string;
+  related_entity_ids: string[];
+};
+
+export type ProcurementForecast = {
+  project: string;
+  phase: string;
+  gmail_send_configured: boolean;
+  items: ProcurementItem[];
+};
+
+export type ProcurementDraftResponse = {
+  enabled: boolean;
+  recipient_email: string;
+  subject?: string;
+  body?: string;
+  disabled_reason?: string;
+};
+
+export type ProcurementSendResponse = {
+  sent: boolean;
+  recipient_email: string;
+  message_id?: string;
+  disabled_reason?: string;
+};
+
 export type SystemStatus = {
   summary_mode: string;
   extraction_mode: string;
@@ -155,6 +185,27 @@ export const api = {
     request<RiskQuestionResponse>("/risk-review/question", {
       method: "POST",
       body: JSON.stringify({ project, phase, question })
+    }),
+  procurementForecast: (project: string, phase: string) =>
+    request<ProcurementForecast>(`/procurement/forecast?project=${project}&phase=${phase}`),
+  procurementDraftEmail: (project: string, phase: string, itemId: string, recipientEmail: string) =>
+    request<ProcurementDraftResponse>("/procurement/draft-email", {
+      method: "POST",
+      body: JSON.stringify({
+        project,
+        phase,
+        item_id: itemId,
+        recipient_email: recipientEmail
+      })
+    }),
+  procurementSendEmail: (recipientEmail: string, subject: string, body: string) =>
+    request<ProcurementSendResponse>("/procurement/send-email", {
+      method: "POST",
+      body: JSON.stringify({
+        recipient_email: recipientEmail,
+        subject,
+        body
+      })
     }),
   digest: (project: string, userId: string, phase: string) =>
     request<Digest>(`/digest?project=${project}&user_id=${userId}&phase=${phase}`),

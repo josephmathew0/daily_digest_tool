@@ -10,6 +10,10 @@ from app.models.enums import SourceType
 
 
 def test_sync_persists_and_reuses_extractions(monkeypatch):
+    monkeypatch.setenv("AI_RISK_REVIEW_ENABLED", "false")
+    monkeypatch.setenv("SUMMARY_MODE", "rules")
+    monkeypatch.setenv("EXTRACTION_MODE", "rules")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     source_event = CommunicationEvent(
         id="slack_test_1",
         source_type=SourceType.SLACK,
@@ -79,6 +83,42 @@ def test_sync_persists_and_reuses_extractions(monkeypatch):
     disabled_payload = disabled_question.json()
     assert disabled_payload["enabled"] is False
     assert disabled_payload["disabled_reason"]
+
+    procurement = client.get("/procurement/forecast?phase=EVT&project=warehouse_robot_v2")
+    assert procurement.status_code == 200
+    procurement_payload = procurement.json()
+    assert procurement_payload["project"] == "warehouse_robot_v2"
+    assert procurement_payload["phase"] == "EVT"
+    assert "gmail_send_configured" in procurement_payload
+    assert "items" in procurement_payload
+
+    draft = client.post(
+        "/procurement/draft-email",
+        json={
+            "project": "warehouse_robot_v2",
+            "phase": "EVT",
+            "item_id": "thermal_validation_spares",
+            "recipient_email": "vendor@example.com",
+        },
+    )
+    assert draft.status_code == 200
+    draft_payload = draft.json()
+    assert draft_payload["enabled"] is False
+    assert draft_payload["recipient_email"] == "vendor@example.com"
+    assert draft_payload["disabled_reason"]
+
+    send_email = client.post(
+        "/procurement/send-email",
+        json={
+            "recipient_email": "vendor@example.com",
+            "subject": "RFQ",
+            "body": "Please quote prototype parts.",
+        },
+    )
+    assert send_email.status_code == 200
+    send_payload = send_email.json()
+    assert send_payload["sent"] is False
+    assert send_payload["disabled_reason"]
 
     system_status = client.get("/system-status").json()
     assert system_status["summary_mode"]

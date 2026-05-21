@@ -175,6 +175,7 @@ EMAIL_INCLUDE_SENT=true
 EMAIL_LOOKBACK_DAYS=14
 EMAIL_REQUIRE_LABEL=false
 EMAIL_GMAIL_LABEL=EverCurrent/Warehouse-Robot-V2
+GMAIL_SEND_ENABLED=false
 ```
 
 For cleaner demos, use a Gmail label and set:
@@ -182,6 +183,14 @@ For cleaner demos, use a Gmail label and set:
 ```env
 EMAIL_REQUIRE_LABEL=true
 ```
+
+The procurement demo can draft quote-request emails with OpenAI. To send the reviewed draft through Gmail, set:
+
+```env
+GMAIL_SEND_ENABLED=true
+```
+
+Then rerun `python scripts/authorize_gmail.py` so `gmail_token.json` includes the Gmail send scope. The dashboard send button remains disabled until Gmail sending is explicitly enabled.
 
 ## OpenAI Setup
 

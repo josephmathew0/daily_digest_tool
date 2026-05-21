@@ -7,8 +7,9 @@ import { BuildReadinessPanel } from "@/components/BuildReadinessPanel";
 import { Controls } from "@/components/Controls";
 import { DigestSection } from "@/components/DigestSection";
 import { Header } from "@/components/Header";
+import { ProcurementPanel } from "@/components/ProcurementPanel";
 import { TimelineView } from "@/components/TimelineView";
-import { api, BuildReadiness, Digest, EventPayload, Project, RiskReview, SystemStatus, User } from "@/services/api";
+import { api, BuildReadiness, Digest, EventPayload, ProcurementForecast, Project, RiskReview, SystemStatus, User } from "@/services/api";
 
 function formatTimestamp(value?: string) {
   if (!value) return "Not yet";
@@ -27,6 +28,7 @@ export default function Home() {
   const [digest, setDigest] = useState<Digest | null>(null);
   const [readiness, setReadiness] = useState<BuildReadiness | null>(null);
   const [riskReview, setRiskReview] = useState<RiskReview | null>(null);
+  const [procurementForecast, setProcurementForecast] = useState<ProcurementForecast | null>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [projectId, setProjectId] = useState("warehouse_robot_v2");
   const [userId, setUserId] = useState("maya");
@@ -38,17 +40,19 @@ export default function Home() {
   async function refresh() {
     // Read-only refresh: reload source evidence, the role-specific digest, and
     // backend mode/count badges without forcing a new source sync.
-    const [nextEvents, nextDigest, nextReadiness, nextRiskReview, nextSystemStatus] = await Promise.all([
+    const [nextEvents, nextDigest, nextReadiness, nextRiskReview, nextProcurementForecast, nextSystemStatus] = await Promise.all([
       api.events(projectId),
       api.digest(projectId, userId, phase),
       api.readiness(projectId, phase),
       api.riskReview(projectId, phase),
+      api.procurementForecast(projectId, phase),
       api.systemStatus()
     ]);
     setEvents(nextEvents);
     setDigest(nextDigest);
     setReadiness(nextReadiness);
     setRiskReview(nextRiskReview);
+    setProcurementForecast(nextProcurementForecast);
     setSystemStatus(nextSystemStatus);
   }
 
@@ -122,6 +126,7 @@ export default function Home() {
 
           <BuildReadinessPanel readiness={readiness} />
           <AIRiskReviewPanel projectId={projectId} phase={phase} review={riskReview} />
+          <ProcurementPanel projectId={projectId} phase={phase} forecast={procurementForecast} />
 
           {digest && Object.entries(digest.sections).map(([section, items]) => (
             <DigestSection key={section} title={section} items={items} />
