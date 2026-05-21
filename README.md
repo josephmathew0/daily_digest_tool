@@ -284,6 +284,23 @@ Docker Compose validation:
 docker compose config
 ```
 
+## Test Coverage and CI
+
+GitHub Actions runs the backend test suite, frontend production build, and Docker Compose config validation on push.
+
+The backend tests cover:
+
+- End-to-end API pipeline behavior for sync, digest, readiness, risk review, procurement, and system status
+- Extraction cache reuse for unchanged events
+- Digest cache reuse through entity fingerprints
+- Entity merging and lifecycle updates for resolved or still-blocked work
+- Relevance filtering for low-signal messages and non-project Gmail
+- Gmail ingestion filtering and normalized event conversion
+- Hybrid extraction fallback behavior
+- Build Readiness classification
+- AI Risk Review enabled/disabled behavior
+- Procurement forecast, OpenAI draft gating, and Gmail send gating
+
 ## Demo Flow
 
 1. Start Docker.
