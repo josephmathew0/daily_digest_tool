@@ -9,6 +9,8 @@ Use low-cost defaults unless you intentionally want OpenAI summaries:
 ```env
 EXTRACTION_MODE=rules
 SUMMARY_MODE=rules
+AI_RISK_REVIEW_ENABLED=false
+GMAIL_SEND_ENABLED=false
 SLACK_SOURCE=both
 EMAIL_SOURCE=both
 ```
@@ -40,6 +42,9 @@ If you switch to OpenAI summary or hybrid extraction later, these badges are the
    - Severity/status/score badges
    - Section ordering: blocked, pending, and active items appear before resolved items; score orders items within each lifecycle group
    - Status strip: summary mode, extraction mode, model, persisted event/entity counts, last sync time, and digest generated time
+   - Build Readiness: milestone-level blockers, risks, missing confirmations, and improving items
+   - AI Risk Review: hardware-specific suggested checks
+   - Request Quote / Draft Procurement Email: predicted procurement needs from the current project state
    - Source Evidence
    - Ignored source events and reasons
 
@@ -126,6 +131,72 @@ Expected behavior after **Sync Sources**:
 
 This demonstrates entity lifecycle tracking: the system updates the durable project state instead of only adding a new message.
 
+## Build Readiness Walkthrough
+
+Point out the **Build Readiness** section after syncing.
+
+Expected behavior:
+
+- The top-level status should summarize whether the selected milestone is ready, at risk, or blocked.
+- Blockers should include items such as motor mount tolerance or validation blockers when they are still unresolved.
+- Missing confirmations should include dependencies or decisions that still need follow-up.
+- Resolved/improving items should remain visible so reviewers can see recent progress without confusing it with open work.
+
+Explain that this is different from the normal Risk section: the digest shows role-aware project entities, while Build Readiness turns those entities into a milestone readiness checklist.
+
+## AI Risk Review Demo
+
+The static suggested checks work without spending OpenAI credits. For the interactive question box, set:
+
+```env
+AI_RISK_REVIEW_ENABLED=true
+OPENAI_API_KEY=your_api_key_here
+```
+
+Restart Docker, then ask:
+
+```text
+What should we verify before releasing the bracket PO?
+```
+
+Expected behavior:
+
+- The answer should separate confirmed project facts from suggested checks.
+- It should mention supplier/manufacturing sign-off, tolerance stack-up, first-article or fit-check validation, and lead-time/availability confirmation when relevant.
+- It should not claim mitigations are complete unless the current project entities support that.
+
+Switch back after the demo if you want to avoid more OpenAI calls:
+
+```env
+AI_RISK_REVIEW_ENABLED=false
+```
+
+## Procurement Forecast and Email Draft Demo
+
+With `OPENAI_API_KEY` configured, find **Request Quote / Draft Procurement Email**.
+
+Expected behavior:
+
+- Forecasted procurement items should be based on current project state, such as prototype brackets, connector/harness samples, motor mount spacers, or thermal validation spares.
+- Click **Draft Email** on a forecasted item.
+- The app should generate a request-for-quote email preview with recipient, subject, and body.
+- The email is AI-drafted from structured project context and the selected procurement item.
+- The **Send Email** button remains disabled while `GMAIL_SEND_ENABLED=false`.
+
+To test actual sending, set:
+
+```env
+GMAIL_SEND_ENABLED=true
+```
+
+Then re-authorize Gmail with the send scope:
+
+```bash
+backend/.venv/bin/python backend/scripts/authorize_gmail.py
+```
+
+Restart Docker and draft the email again. The **Send Email** button should become enabled. Sending is still a request-for-quote demo; it does not place a purchase order.
+
 ## OpenAI Summary Demo
 
 Only use this when you want to spend API credits.
@@ -204,6 +275,9 @@ EXTRACTION_MODE=rules
 - Relevance filtering happens before extraction to reduce noise and future LLM cost.
 - Raw normalized events are retained as evidence, while extracted entities are the durable project state used for the digest.
 - Extraction and digest results are cached using event hashes and entity fingerprints.
+- Build Readiness reframes the same project state as a milestone checklist.
+- AI Risk Review adds hardware-specific proactive questions that may not be explicitly mentioned in the source messages.
+- Procurement forecast demonstrates a practical agentic workflow: detect likely stock/quote needs, draft a request email, and optionally send after user review.
 - OpenAI is optional and has rule-based fallback behavior.
 - Hybrid extraction calls OpenAI only for relevant, uncertain events and caches the result.
 - Digest sections are lifecycle-aware: unresolved operational work appears before recently resolved items.

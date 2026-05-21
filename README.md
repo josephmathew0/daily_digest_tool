@@ -21,6 +21,12 @@ The core idea is entity-centric memory. Slack and email are evidence sources; th
 - Rule-based extraction by default
 - Rule-based entity lifecycle tracking for resolved, still-blocked, and updated items
 - Lifecycle-aware digest ordering: blocked, pending, and active items before resolved items
+- Build Readiness panel for milestone-level blockers, risks, confirmations, and improving items
+- AI Risk Review with hardware-specific suggested checks
+- Optional AI Risk Review follow-up questions through `AI_RISK_REVIEW_ENABLED=true`
+- Procurement forecast for likely quote/stock needs based on current project state
+- OpenAI-generated request-for-quote email drafts from forecasted procurement items
+- Optional Gmail send flow for reviewed procurement drafts through `GMAIL_SEND_ENABLED=true`
 - Optional OpenAI summaries through `SUMMARY_MODE=openai`
 - Optional hybrid OpenAI extraction for relevant, uncertain events
 - OpenAI fallback behavior so API failures do not break the app
@@ -37,8 +43,8 @@ Slack / Gmail / Mock JSON / Manual Event
   -> Extraction Cache
   -> Rule / Hybrid / OpenAI Extraction
   -> Entity Merge + Project State
-  -> Digest Cache
-  -> Role-aware Digest API
+  -> Digest Cache / Readiness / Risk Review / Procurement Forecast
+  -> Role-aware Digest + Action APIs
   -> Next.js Dashboard
 ```
 
@@ -95,6 +101,8 @@ EXTRACTION_MODE=rules
 SUMMARY_MODE=rules
 OPENAI_MODEL=gpt-5-mini
 OPENAI_API_KEY=
+AI_RISK_REVIEW_ENABLED=false
+GMAIL_SEND_ENABLED=false
 ```
 
 Source mode options:
@@ -159,8 +167,7 @@ SLACK_CHANNEL_NAME=warehouse-robot-v2
 6. Run the authorization helper:
 
 ```bash
-cd backend
-python scripts/authorize_gmail.py
+backend/.venv/bin/python backend/scripts/authorize_gmail.py
 ```
 
 This creates `gmail_token.json`. Both files are ignored by Git.
@@ -190,7 +197,13 @@ The procurement demo can draft quote-request emails with OpenAI. To send the rev
 GMAIL_SEND_ENABLED=true
 ```
 
-Then rerun `python scripts/authorize_gmail.py` so `gmail_token.json` includes the Gmail send scope. The dashboard send button remains disabled until Gmail sending is explicitly enabled.
+Then rerun `backend/.venv/bin/python backend/scripts/authorize_gmail.py` so `gmail_token.json` includes the Gmail send scope. The dashboard send button remains disabled until Gmail sending is explicitly enabled.
+
+If you are already inside the `backend/` directory, run:
+
+```bash
+.venv/bin/python scripts/authorize_gmail.py
+```
 
 ## OpenAI Setup
 
@@ -216,6 +229,14 @@ OPENAI_API_KEY=your_api_key_here
 ```
 
 Hybrid extraction runs rules first and only uses OpenAI when the rule result is missing or low-confidence. Extraction results are cached by event hash, mode, version, and model.
+
+For AI Risk Review follow-up questions and procurement email drafting, keep a valid `OPENAI_API_KEY` and use:
+
+```env
+AI_RISK_REVIEW_ENABLED=true
+```
+
+The static AI Risk Review checks and procurement forecast still work without this flag. The flag controls the interactive OpenAI follow-up behavior.
 
 ## Ordering and Caching
 
@@ -271,10 +292,15 @@ docker compose config
 4. Switch between roles such as Maya, Alex, Priya, Sam, and Jordan.
 5. Click **Sync Sources**.
 6. Review the team-wide summary and role-specific sections.
-7. Open Source Evidence and confirm ignored events are separated with reasons.
-8. Add a manual communication event or send a Slack/Gmail test message.
-9. Click **Sync Sources** again and verify the digest updates.
-10. Optional: switch `SUMMARY_MODE=openai`, restart Docker, and compare the OpenAI summary against the rule summary.
+7. Review **Build Readiness** for milestone blockers, risks, missing confirmations, and improving items.
+8. Review **AI Risk Review** for hardware-specific risk checks.
+9. Review **Request Quote / Draft Procurement Email** for forecasted procurement needs.
+10. Click **Draft Email** on a predicted procurement item and confirm the email preview appears.
+11. Open Source Evidence and confirm ignored events are separated with reasons.
+12. Add a manual communication event or send a Slack/Gmail test message.
+13. Click **Sync Sources** again and verify the digest updates.
+14. Optional: switch `SUMMARY_MODE=openai`, restart Docker, and compare the OpenAI summary against the rule summary.
+15. Optional: enable `GMAIL_SEND_ENABLED=true`, re-authorize Gmail, restart Docker, and test sending a reviewed procurement draft.
 
 See [DEMO_SCRIPT.md](DEMO_SCRIPT.md) for exact messages and expected behavior.
 
