@@ -126,11 +126,15 @@ export default function Home() {
 
           <BuildReadinessPanel readiness={readiness} />
           <AIRiskReviewPanel projectId={projectId} phase={phase} review={riskReview} />
-          <ProcurementPanel projectId={projectId} phase={phase} forecast={procurementForecast} />
 
           {digest && Object.entries(digest.sections).map(([section, items]) => (
             <DigestSection key={section} title={section} items={items} />
           ))}
+
+          <section>
+            <h2 className="mb-2 text-base font-semibold">Predicted Stock Requirements</h2>
+            <ProcurementPanel projectId={projectId} phase={phase} forecast={procurementForecast} />
+          </section>
         </div>
 
         <aside className="grid content-start gap-5">
